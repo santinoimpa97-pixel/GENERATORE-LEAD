@@ -82,7 +82,10 @@ serve(async (req) => {
 
     const msg = {
       to: to,
-      from: 'info@esempiocrm.com', // <-- IMPORTANTE: Usa il tuo indirizzo verificato su SendGrid.
+      from: {
+        name: 'INFINITYSPEED',
+        email: 'info@esempiocrm.com', // <-- IMPORTANTE: Usa il tuo indirizzo verificato su SendGrid.
+      },
       subject: subject,
       html: body.replace(/\n/g, '<br>'),
       attachments: sgAttachments,
