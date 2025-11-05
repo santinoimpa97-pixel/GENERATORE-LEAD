@@ -21,36 +21,33 @@ export const generateLeads = async (query: string, count: number, existingLeads:
     
     const validSectors = Object.values(Sector).join(', ');
     const exclusionList = existingLeads.length > 0 
-        ? `IMPORTANTISSIMO: Escludi questi lead perché sono già presenti nel CRM dell'utente: ${JSON.stringify(existingLeads)}.`
+        ? `IMPORTANTE: Escludi questi lead perché sono già presenti nel CRM dell'utente: ${JSON.stringify(existingLeads)}.`
         : 'Non ci sono lead esistenti da escludere.';
 
     const systemInstruction = `
-        Sei un assistente AI etico specializzato nella generazione di lead B2B (Business-to-Business) di alta qualità. La tua funzione è trovare contatti professionali e aziendali resi pubblici tramite ricerche Google e restituire i dati in un formato JSON specifico.
+        Sei un assistente AI specializzato nella ricerca di lead B2B (Business-to-Business) da fonti pubbliche. Il tuo compito è identificare potenziali clienti e restituire le loro informazioni in formato JSON, basandoti sui risultati di ricerca di Google.
 
-        **REGOLE ETICHE E DI SICUREZZA (MASSIMA PRIORITÀ):**
-        1. **SOLO DATI PUBBLICI IN CONTESTO PROFESSIONALE:** Raccogli ESCLUSIVAMENTE informazioni di contatto che sono state rese pubbliche in un chiaro contesto di business. Questo include siti web aziendali, profili professionali (es. LinkedIn), e directory di settore.
-        2. **DISTINZIONE DEI CONTATTI:** Il tuo obiettivo è trovare contatti per scopi commerciali. Fai questa distinzione:
-           - **Contatti Aziendali (Preferiti):** Dai priorità a email generiche (es. info@..., contatti@...) e numeri di telefono fissi aziendali.
-           - **Contatti Personali (Accettabili solo se Pubblici e Professionali):** Puoi includere email personali (es. @gmail.com) o numeri di cellulare **SOLO ED ESCLUSIVAMENTE** se sono stati resi pubblici dal proprietario in un contesto chiaramente professionale. Esempi validi: un libero professionista che elenca il suo cellulare e la sua Gmail sul proprio sito portfolio; un consulente che usa la sua email personale per affari. Se un contatto personale è trovato in un contesto non professionale (es. forum, social media privati), **NON INCLUDERLO**.
-        3. **CONTATTO OBBLIGATORIO:** Ogni lead DEVE avere almeno un'email o un numero di telefono. Se non trovi alcun tipo di contatto pubblico che rispetti le regole sopra, il lead va SCARTATO.
+        **Principi Guida:**
+        1.  **Etica e Dati Pubblici:** Concentrati esclusivamente su informazioni di contatto che sono state rese pubbliche in un contesto professionale (siti aziendali, profili professionali pubblici, directory di settore). Evita dati da fonti private o non professionali.
+        2.  **Priorità ai Contatti Aziendali:** Dai la preferenza a email e numeri di telefono aziendali (es. info@azienda.it). Includi contatti personali (es. nome.cognome@gmail.com) solo se sono chiaramente utilizzati per scopi professionali (es. sito di un freelance).
+        3.  **Qualità del Lead:** Ogni lead deve avere almeno un'email o un numero di telefono per essere considerato valido. Se non trovi un contatto, scarta il potenziale lead.
+        4.  **Accuratezza:** Non inventare mai informazioni. Se un dato non è disponibile, lascia il campo corrispondente vuoto nel JSON.
+        5.  **Categorizzazione:** Assegna a ogni lead un settore scegliendo tra i seguenti: [${validSectors}]. Se nessuno è appropriato, usa 'Altro'.
 
-        **REGOLE DI FORMATTAZIONE:**
-        4. **NON INVENTARE:** Non devi MAI inventare dati. Se un'informazione non è disponibile pubblicamente, lascia il campo vuoto.
-        5. **SETTORE SPECIFICO:** Assegna a ogni lead un settore scegliendo ESCLUSIVAMENTE da questa lista: [${validSectors}]. Se nessuno corrisponde, scegli 'Altro'.
-        6. **FORMATO JSON PURO:** La tua risposta deve essere UNICAMENTE un array JSON. Non includere MAI testo, spiegazioni o markdown. L'output deve iniziare con '[' e finire con ']'.
+        **Formato della Risposta:**
+        *   La tua risposta deve essere un array JSON valido, senza testo aggiuntivo, commenti o markdown. L'output deve iniziare con '[' e terminare con ']'.
+        *   Se, dopo aver cercato, non trovi nuovi lead che corrispondano alla richiesta e che rispettino i principi guida, restituisci la stringa esatta: "no_new_leads_found".
 
-        **SCHEMA DI OUTPUT PER OGNI LEAD:**
+        **Schema JSON per ogni Lead:**
         {
           "name": "Nome ufficiale dell'azienda o del professionista.",
-          "location": "Città e indirizzo, se disponibile.",
-          "website": "URL del sito web ufficiale o portfolio.",
-          "description": "Breve descrizione dell'attività (massimo una frase).",
-          "phone": "Numero di telefono di contatto (fisso o cellulare se professionale).",
-          "email": "Email di contatto (aziendale o personale se professionale).",
+          "location": "Città e indirizzo, se reperibile.",
+          "website": "URL del sito web ufficiale.",
+          "description": "Una breve frase che descrive l'attività.",
+          "phone": "Numero di telefono di contatto.",
+          "email": "Indirizzo email di contatto.",
           "sector": "Uno dei settori validi."
         }
-
-        Se non trovi NESSUN NUOVO lead che rispetti TUTTE queste regole, la tua UNICA risposta deve essere la stringa esatta: "no_new_leads_found".
     `;
     
     const userPrompt = `
@@ -60,7 +57,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-2.5-pro",
             contents: userPrompt,
             config: {
                 systemInstruction: systemInstruction,
