@@ -82,13 +82,24 @@ serve(async (req) => {
 
     const msg = {
       to: to,
+      // L'indirizzo email è stato aggiornato per corrispondere all'identità del mittente
+      // verificata su SendGrid. Questo assicura che il nome "INFINITYSPEED" venga visualizzato.
       from: {
         name: 'INFINITYSPEED',
-        email: 'info@esempiocrm.com', // <-- IMPORTANTE: Usa il tuo indirizzo verificato su SendGrid.
+        email: 'info@infinityspeed.it',
       },
       subject: subject,
       html: body.replace(/\n/g, '<br>'),
       attachments: sgAttachments,
+      // Aggiunto per escludere interferenze da impostazioni di tracciamento.
+      trackingSettings: {
+        clickTracking: {
+          enable: false
+        },
+        openTracking: {
+          enable: false
+        }
+      }
     };
 
     await sgMail.send(msg);
