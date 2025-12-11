@@ -21,43 +21,52 @@ export const generateLeads = async (query: string, count: number, existingLeads:
     
     const validSectors = Object.values(Sector).join(', ');
     const exclusionList = existingLeads.length > 0 
-        ? `IMPORTANTE: Escludi questi lead perché sono già presenti nel CRM dell'utente: ${JSON.stringify(existingLeads)}.`
-        : 'Non ci sono lead esistenti da escludere.';
+        ? `IMPORTANTE: Escludi ASSOLUTAMENTE questi lead già presenti (non restituirli): ${JSON.stringify(existingLeads)}.`
+        : '';
 
     const systemInstruction = `
-        Sei un assistente AI specializzato nella ricerca di lead B2B (Business-to-Business) da fonti pubbliche. Il tuo compito è identificare potenziali clienti e restituire le loro informazioni in formato JSON, basandoti sui risultati di ricerca di Google.
+        Sei un assistente AI specializzato nella Lead Generation B2B con focus su **WhatsApp Marketing**.
 
-        **Principi Guida:**
-        1.  **Etica e Dati Pubblici:** Concentrati esclusivamente su informazioni di contatto che sono state rese pubbliche in un contesto professionale (siti aziendali, profili professionali pubblici, directory di settore). Evita dati da fonti private o non professionali.
-        2.  **Priorità ai Contatti Aziendali:** Dai la preferenza a email e numeri di telefono aziendali (es. info@azienda.it). Includi contatti personali (es. nome.cognome@gmail.com) solo se sono chiaramente utilizzati per scopi professionali (es. sito di un freelance).
-        3.  **Qualità del Lead:** Ogni lead deve avere almeno un'email o un numero di telefono per essere considerato valido. Se non trovi un contatto, scarta il potenziale lead.
-        4.  **Accuratezza:** Non inventare mai informazioni. Se un dato non è disponibile, lascia il campo corrispondente vuoto nel JSON.
-        5.  **Categorizzazione:** Assegna a ogni lead un settore scegliendo tra i seguenti: [${validSectors}]. Se nessuno è appropriato, usa 'Altro'.
+        PROTOCOLLO OPERATIVO OBBLIGATORIO:
+        1.  **RICERCA:** Utilizza ORA lo strumento 'googleSearch' per cercare aziende reali. Cerca specificamente pagine "Contatti", footer di siti web e profili social per trovare numeri di telefono.
+        2.  **FOCUS WHATSAPP:** Il tuo obiettivo principale è trovare numeri di **cellulare** o numeri indicati come **WhatsApp**. Cerca prefissi mobili (es. +39 3...) o diciture "scrivici su WhatsApp".
+        3.  **ESTRAZIONE:** 
+            - Se un'azienda ha sia un numero fisso che un cellulare, **INSERISCI IL CELLULARE** nel campo 'phone'.
+            - Se trovi solo il fisso, inserisci quello, ma dai priorità ai risultati con cellulare.
+        4.  **OUTPUT:** Genera un array JSON con i risultati.
 
-        **Formato della Risposta:**
-        *   La tua risposta deve essere un array JSON valido, senza testo aggiuntivo, commenti o markdown. L'output deve iniziare con '[' e terminare con ']'.
-        *   Se, dopo aver cercato, non trovi nuovi lead che corrispondano alla richiesta e che rispettino i principi guida, restituisci la stringa esatta: "no_new_leads_found".
+        CRITERI DI QUALITÀ:
+        *   **Solo Dati Reali:** Non inventare mai email o numeri. Se non trovi un dato, lascia il campo vuoto o omettilo.
+        *   **B2B Focus:** Privilegia contatti aziendali pubblici.
+        *   **Settori Validi:** [${validSectors}]. Usa 'Altro' se incerto.
 
-        **Schema JSON per ogni Lead:**
+        FORMATO RISPOSTA:
+        Restituisci ESCLUSIVAMENTE un array JSON valido [ ... ].
+        NON usare blocchi markdown (\`\`\`json).
+        NON scrivere testo introduttivo (es. "Ecco i lead...").
+        Se non trovi NUOVI lead validi dopo la ricerca, restituisci esattamente la stringa: "no_new_leads_found".
+
+        SCHEMA OGGETTO LEAD:
         {
-          "name": "Nome ufficiale dell'azienda o del professionista.",
-          "location": "Città e indirizzo, se reperibile.",
-          "website": "URL del sito web ufficiale.",
-          "description": "Una breve frase che descrive l'attività.",
-          "phone": "Numero di telefono di contatto.",
-          "email": "Indirizzo email di contatto.",
-          "sector": "Uno dei settori validi."
+          "name": "Nome Azienda",
+          "location": "Indirizzo/Città",
+          "website": "URL Sito",
+          "description": "Breve descrizione attività",
+          "phone": "Telefono (Preferibilmente Cellulare/WhatsApp)",
+          "email": "Email",
+          "sector": "Settore"
         }
     `;
     
     const userPrompt = `
-        Trova ${count} lead commerciali unici basati sulla seguente richiesta: "${query}".
+        Trova ${count} lead B2B per: "${query}".
         ${exclusionList}
+        Usa Google Search. Dai priorità assoluta alle aziende che mostrano un numero di **cellulare** o **WhatsApp** visibile.
     `;
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
+            model: "gemini-3-pro-preview",
             contents: userPrompt,
             config: {
                 systemInstruction: systemInstruction,
@@ -68,15 +77,19 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         if (response.candidates?.[0]?.finishReason && response.candidates[0].finishReason !== 'STOP') {
             const reason = response.candidates[0].finishReason;
             console.error(`Generazione interrotta da Gemini. Motivo: ${reason}.`);
+            
             if (reason === 'SAFETY') {
                  throw new Error(`blocked:SAFETY`);
+            }
+            if (reason === 'MALFORMED_FUNCTION_CALL') {
+                throw new Error(`malformed_function_call`);
             }
             throw new Error(`interrupted:${reason}`);
         }
         
         if (!response.text) {
              if (response.candidates && response.candidates.length > 0) {
-                // Gestisce il caso in cui ci sono candidati ma nessun testo, che potrebbe implicare un blocco non segnalato
+                console.warn("Risposta con candidati ma senza testo. Grounding metadata:", response.candidates[0].groundingMetadata);
                 throw new Error('empty_response_with_candidates');
             }
             throw new Error('empty_response');
@@ -88,12 +101,15 @@ export const generateLeads = async (query: string, count: number, existingLeads:
             throw new Error('no_new_leads_found');
         }
         
-        let jsonString = text;
-        if (jsonString.startsWith('```json')) {
-            jsonString = jsonString.slice(7, -3).trim();
-        } else if (jsonString.startsWith('```')) {
-            jsonString = jsonString.slice(3, -3).trim();
+        // Estrazione robusta del JSON: Cerca la prima [ e l'ultima ]
+        const startIndex = text.indexOf('[');
+        const endIndex = text.lastIndexOf(']');
+
+        if (startIndex === -1 || endIndex === -1) {
+             throw new SyntaxError("L'AI ha restituito del testo ma non è un array JSON valido.");
         }
+
+        const jsonString = text.substring(startIndex, endIndex + 1);
 
         const parsedLeads: Partial<Lead>[] = JSON.parse(jsonString);
         
@@ -116,47 +132,52 @@ export const generateLeads = async (query: string, count: number, existingLeads:
 
         if (error instanceof SyntaxError) {
             throw new Error(
-                "L'AI ha risposto in un formato inaspettato (non JSON valido). Questo può accadere a causa di un output imprevisto del modello. Riprova la tua ricerca."
+                "L'AI ha risposto in un formato non valido (probabile testo extra). Riprova."
             );
         }
 
         if (error instanceof Error) {
+            if (error.message === 'malformed_function_call') {
+                throw new Error(
+                    "Errore tecnico nella comunicazione con lo strumento di ricerca dell'AI (Malformed Call). Per favore riprova la ricerca."
+                );
+            }
             if (error.message.startsWith('blocked:')) {
                 const reason = error.message.split(':')[1];
                 throw new Error(
-                    `La ricerca è stata bloccata per motivi di sicurezza (Codice: ${reason}). Questo accade quando la richiesta o i risultati contengono argomenti sensibili. Prova a riformulare la ricerca con termini più generici e professionali.`
+                    `La ricerca è stata bloccata per motivi di sicurezza (Codice: ${reason}). Prova a riformulare con termini più professionali.`
                 );
             }
              if (error.message.startsWith('interrupted:')) {
                 const reason = error.message.split(':')[1];
                 throw new Error(
-                    `La generazione è stata interrotta (Codice: ${reason}). Prova a semplificare la ricerca.`
+                    `La generazione è stata interrotta (Codice: ${reason}). Riprova.`
                 );
             }
             if (error.message === 'empty_response' || error.message === 'empty_response_with_candidates') {
                 throw new Error(
-                    "L'AI ha restituito una risposta vuota. Questo è spesso causato da filtri di sicurezza molto restrittivi. Riprova o modifica i termini della ricerca per essere più specifico su contesti aziendali."
+                    "L'AI non ha restituito dati leggibili. Potrebbe aver provato a cercare senza successo. Riprova."
                 );
             }
             if (error.message === 'no_new_leads_found') {
                 throw new Error(
-                    "L'AI non ha trovato nuovi lead unici per questa ricerca. Potresti averli già tutti o la ricerca era troppo specifica. Prova a usare termini diversi."
+                    "L'AI non ha trovato nuovi lead unici per questa ricerca. Potresti averli già tutti o la ricerca era troppo specifica."
                 );
             }
             if (error.message.includes('API key not valid')) {
                 throw new Error(
-                    "Errore di autenticazione: La tua API Key per Gemini non è valida o è scaduta. Controlla le tue impostazioni."
+                    "Errore di autenticazione: API Key non valida."
                 );
             }
             if (error.message.toLowerCase().includes('quota')) {
                  throw new Error(
-                    "Limite di richieste raggiunto: Hai superato la tua quota di utilizzo per l'API di Gemini. Attendi un po' prima di riprovare."
+                    "Hai superato la tua quota di utilizzo API. Attendi qualche minuto."
                 );
             }
-             // For other generic API errors from the SDK
-            throw new Error(`Errore di comunicazione con l'AI: ${error.message}`);
+             // For other generic API errors
+            throw new Error(`Errore AI: ${error.message}`);
         }
         
-        throw new Error("Si è verificato un errore sconosciuto durante la generazione di lead. Controlla la console per i dettagli.");
+        throw new Error("Errore sconosciuto durante la generazione.");
     }
 };
