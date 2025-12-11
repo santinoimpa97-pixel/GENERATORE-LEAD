@@ -1,13 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 import { Lead, Source, Sector } from '../types';
 
-// Implementazione di un fallback per consentire lo sviluppo locale e la produzione.
-// Vercel utilizzerà la variabile API_KEY, mentre l'anteprima locale userà il valore segnaposto.
-// L'utente deve sostituire questo segnaposto per far funzionare l'anteprima.
-const apiKey = process.env.API_KEY || "AIzaSyCZQEn1PJQwko91jg2rx-zPWxyKCB7iSr4";
+// La chiave API deve essere fornita ESCLUSIVAMENTE tramite variabili d'ambiente.
+// Non inserire mai chiavi reali direttamente nel codice per evitare che vengano revocate da Google.
+const apiKey = process.env.API_KEY;
 
-// Il controllo per la chiave segnaposto è stato rimosso per consentire il funzionamento dell'anteprima.
-// In un ambiente di produzione, è necessario impostare una API_KEY valida.
 export const geminiConnectionError = !apiKey
     ? "La variabile d'ambiente API_KEY è obbligatoria." 
     : null;
@@ -16,7 +13,7 @@ const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export const generateLeads = async (query: string, count: number, existingLeads: { name: string; location: string }[]): Promise<Partial<Lead>[]> => {
     if (!ai) {
-        throw new Error("La chiave API di Gemini non è configurata. Imposta API_KEY nelle tue variabili d'ambiente o nel file di servizio.");
+        throw new Error("La chiave API di Gemini non è configurata. Imposta API_KEY nelle tue variabili d'ambiente su Vercel.");
     }
     
     const validSectors = Object.values(Sector).join(', ');
@@ -65,14 +62,45 @@ export const generateLeads = async (query: string, count: number, existingLeads:
     `;
 
     try {
-        const response = await ai.models.generateContent({
-            model: "gemini-3-pro-preview",
-            contents: userPrompt,
-            config: {
-                systemInstruction: systemInstruction,
-                tools: [{ googleSearch: {} }],
-            },
-        });
+        let response;
+        let attempt = 0;
+        const maxRetries = 3;
+
+        // Loop di retry per gestire errori transitori (500, Internal Error)
+        while (true) {
+            try {
+                attempt++;
+                response = await ai.models.generateContent({
+                    model: "gemini-3-pro-preview",
+                    contents: userPrompt,
+                    config: {
+                        systemInstruction: systemInstruction,
+                        tools: [{ googleSearch: {} }],
+                    },
+                });
+                break; // Se ha successo, esci dal ciclo
+            } catch (apiError: any) {
+                const msg = apiError.message || JSON.stringify(apiError);
+                console.warn(`Tentativo ${attempt} Gemini fallito:`, msg);
+
+                // Controlla se è un errore server (5xx) o un errore interno generico
+                const isRetriable = msg.includes('500') || 
+                                    msg.includes('503') || 
+                                    msg.includes('Internal error') || 
+                                    msg.includes('INTERNAL') ||
+                                    msg.includes('Overloaded');
+
+                if (isRetriable && attempt < maxRetries) {
+                    const delay = Math.pow(2, attempt) * 1000; // Backoff esponenziale: 2s, 4s
+                    console.log(`Riprovo tra ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    continue;
+                }
+                
+                // Se non è riprovabile o abbiamo finito i tentativi, lancia l'errore
+                throw apiError;
+            }
+        }
 
         if (response.candidates?.[0]?.finishReason && response.candidates[0].finishReason !== 'STOP') {
             const reason = response.candidates[0].finishReason;
@@ -137,45 +165,52 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         }
 
         if (error instanceof Error) {
-            if (error.message === 'malformed_function_call') {
+            const msg = error.message || '';
+            
+            if (msg.includes('Internal error') || msg.includes('500') || msg.includes('INTERNAL')) {
+                throw new Error(
+                    "Errore momentaneo sui server di Google (Internal Error). Riprova tra qualche secondo."
+                );
+            }
+            if (msg === 'malformed_function_call') {
                 throw new Error(
                     "Errore tecnico nella comunicazione con lo strumento di ricerca dell'AI (Malformed Call). Per favore riprova la ricerca."
                 );
             }
-            if (error.message.startsWith('blocked:')) {
-                const reason = error.message.split(':')[1];
+            if (msg.startsWith('blocked:')) {
+                const reason = msg.split(':')[1];
                 throw new Error(
                     `La ricerca è stata bloccata per motivi di sicurezza (Codice: ${reason}). Prova a riformulare con termini più professionali.`
                 );
             }
-             if (error.message.startsWith('interrupted:')) {
-                const reason = error.message.split(':')[1];
+             if (msg.startsWith('interrupted:')) {
+                const reason = msg.split(':')[1];
                 throw new Error(
                     `La generazione è stata interrotta (Codice: ${reason}). Riprova.`
                 );
             }
-            if (error.message === 'empty_response' || error.message === 'empty_response_with_candidates') {
+            if (msg === 'empty_response' || msg === 'empty_response_with_candidates') {
                 throw new Error(
                     "L'AI non ha restituito dati leggibili. Potrebbe aver provato a cercare senza successo. Riprova."
                 );
             }
-            if (error.message === 'no_new_leads_found') {
+            if (msg === 'no_new_leads_found') {
                 throw new Error(
                     "L'AI non ha trovato nuovi lead unici per questa ricerca. Potresti averli già tutti o la ricerca era troppo specifica."
                 );
             }
-            if (error.message.includes('API key not valid')) {
+            if (msg.includes('API key not valid') || msg.includes('leaked')) {
                 throw new Error(
-                    "Errore di autenticazione: API Key non valida."
+                    "Errore API Key: La chiave è stata revocata o non è valida. Controlla le impostazioni di Vercel."
                 );
             }
-            if (error.message.toLowerCase().includes('quota')) {
+            if (msg.toLowerCase().includes('quota')) {
                  throw new Error(
                     "Hai superato la tua quota di utilizzo API. Attendi qualche minuto."
                 );
             }
              // For other generic API errors
-            throw new Error(`Errore AI: ${error.message}`);
+            throw new Error(`Errore AI: ${msg}`);
         }
         
         throw new Error("Errore sconosciuto durante la generazione.");

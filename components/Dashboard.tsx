@@ -9,7 +9,6 @@ import Stats from './Stats';
 import LeadGenerator from './LeadGenerator';
 import FilterControls from './FilterControls';
 import LeadList from './LeadList';
-import Modal from './Modal';
 import LeadForm from './LeadForm';
 import BulkActionBar from './BulkActionBar';
 import ColumnManagerModal from './ColumnManagerModal';
@@ -823,14 +822,13 @@ const Dashboard: React.FC = () => {
             </main>
 
             {/* Modals */}
-            <Modal isOpen={isLeadModalOpen} onClose={() => setIsLeadModalOpen(false)}>
-                <LeadForm
-                    lead={editingLead}
-                    columns={columns}
-                    onSave={handleSaveLead}
-                    onClose={() => setIsLeadModalOpen(false)}
-                />
-            </Modal>
+            <LeadForm
+                isOpen={isLeadModalOpen}
+                lead={editingLead}
+                columns={columns}
+                onSave={handleSaveLead}
+                onClose={() => setIsLeadModalOpen(false)}
+            />
             
             <ColumnManagerModal
                 isOpen={isColumnManagerOpen}
@@ -856,7 +854,6 @@ const Dashboard: React.FC = () => {
                 leads={leads.filter(l => selectedLeadIds.has(l.id))}
                 templates={emailTemplates}
                 onSend={async (subject, body, attachments) => {
-                    // Fix: Return a boolean to match the expected 'onSend' prop type.
                     const success = await handleSendBulkEmail(leads.filter(l => selectedLeadIds.has(l.id)), subject, body, attachments);
                     if(success) {
                         setIsBulkEmailOpen(false);
@@ -874,7 +871,6 @@ const Dashboard: React.FC = () => {
                 lead={editingLead as Lead}
                 templates={emailTemplates}
                 onSend={async (subject, body, attachments) => {
-                    // Fix: Return a boolean to match the expected 'onSend' prop type.
                     const success = await handleSendSingleEmail(editingLead as Lead, subject, body, attachments);
                     if(success) {
                         setIsSingleEmailOpen(false);
