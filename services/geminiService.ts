@@ -6,7 +6,7 @@ import { Lead, Source, Sector } from '../types';
 const apiKey = process.env.API_KEY;
 
 export const geminiConnectionError = !apiKey
-    ? "La variabile d'ambiente API_KEY è obbligatoria." 
+    ? "La variabile d'ambiente API_KEY è obbligatoria."
     : null;
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
@@ -15,9 +15,9 @@ export const generateLeads = async (query: string, count: number, existingLeads:
     if (!ai) {
         throw new Error("La chiave API di Gemini non è configurata. Imposta API_KEY nelle tue variabili d'ambiente su Vercel.");
     }
-    
+
     const validSectors = Object.values(Sector).join(', ');
-    const exclusionList = existingLeads.length > 0 
+    const exclusionList = existingLeads.length > 0
         ? `IMPORTANTE: Escludi ASSOLUTAMENTE questi lead già presenti (non restituirli): ${JSON.stringify(existingLeads)}.`
         : '';
 
@@ -54,7 +54,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
           "sector": "Settore"
         }
     `;
-    
+
     const userPrompt = `
         Trova ${count} lead B2B per: "${query}".
         ${exclusionList}
@@ -71,11 +71,11 @@ export const generateLeads = async (query: string, count: number, existingLeads:
             try {
                 attempt++;
                 response = await ai.models.generateContent({
-                    model: "gemini-3-pro-preview",
+                    model: "gemini-2.0-flash",
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
-                        tools: [{ googleSearch: {} }],
+                        // tools: [{ googleSearch: {} }], // TEMPORANEAMENTE DISABILITATO PER TEST
                     },
                 });
                 break; // Se ha successo, esci dal ciclo
@@ -84,11 +84,11 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                 console.warn(`Tentativo ${attempt} Gemini fallito:`, msg);
 
                 // Controlla se è un errore server (5xx) o un errore interno generico
-                const isRetriable = msg.includes('500') || 
-                                    msg.includes('503') || 
-                                    msg.includes('Internal error') || 
-                                    msg.includes('INTERNAL') ||
-                                    msg.includes('Overloaded');
+                const isRetriable = msg.includes('500') ||
+                    msg.includes('503') ||
+                    msg.includes('Internal error') ||
+                    msg.includes('INTERNAL') ||
+                    msg.includes('Overloaded');
 
                 if (isRetriable && attempt < maxRetries) {
                     const delay = Math.pow(2, attempt) * 1000; // Backoff esponenziale: 2s, 4s
@@ -96,7 +96,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     await new Promise(resolve => setTimeout(resolve, delay));
                     continue;
                 }
-                
+
                 // Se non è riprovabile o abbiamo finito i tentativi, lancia l'errore
                 throw apiError;
             }
@@ -105,18 +105,18 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         if (response.candidates?.[0]?.finishReason && response.candidates[0].finishReason !== 'STOP') {
             const reason = response.candidates[0].finishReason;
             console.error(`Generazione interrotta da Gemini. Motivo: ${reason}.`);
-            
+
             if (reason === 'SAFETY') {
-                 throw new Error(`blocked:SAFETY`);
+                throw new Error(`blocked:SAFETY`);
             }
             if (reason === 'MALFORMED_FUNCTION_CALL') {
                 throw new Error(`malformed_function_call`);
             }
             throw new Error(`interrupted:${reason}`);
         }
-        
+
         if (!response.text) {
-             if (response.candidates && response.candidates.length > 0) {
+            if (response.candidates && response.candidates.length > 0) {
                 console.warn("Risposta con candidati ma senza testo. Grounding metadata:", response.candidates[0].groundingMetadata);
                 throw new Error('empty_response_with_candidates');
             }
@@ -128,19 +128,19 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         if (text === 'no_new_leads_found') {
             throw new Error('no_new_leads_found');
         }
-        
+
         // Estrazione robusta del JSON: Cerca la prima [ e l'ultima ]
         const startIndex = text.indexOf('[');
         const endIndex = text.lastIndexOf(']');
 
         if (startIndex === -1 || endIndex === -1) {
-             throw new SyntaxError("L'AI ha restituito del testo ma non è un array JSON valido.");
+            throw new SyntaxError("L'AI ha restituito del testo ma non è un array JSON valido.");
         }
 
         const jsonString = text.substring(startIndex, endIndex + 1);
 
         const parsedLeads: Partial<Lead>[] = JSON.parse(jsonString);
-        
+
         const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
         const sources: Source[] | undefined = groundingMetadata?.groundingChunks
             ?.map((chunk: any) => ({
@@ -166,7 +166,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
 
         if (error instanceof Error) {
             const msg = error.message || '';
-            
+
             if (msg.includes('Internal error') || msg.includes('500') || msg.includes('INTERNAL')) {
                 throw new Error(
                     "Errore momentaneo sui server di Google (Internal Error). Riprova tra qualche secondo."
@@ -183,7 +183,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     `La ricerca è stata bloccata per motivi di sicurezza (Codice: ${reason}). Prova a riformulare con termini più professionali.`
                 );
             }
-             if (msg.startsWith('interrupted:')) {
+            if (msg.startsWith('interrupted:')) {
                 const reason = msg.split(':')[1];
                 throw new Error(
                     `La generazione è stata interrotta (Codice: ${reason}). Riprova.`
@@ -205,14 +205,14 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                 );
             }
             if (msg.toLowerCase().includes('quota')) {
-                 throw new Error(
+                throw new Error(
                     "Hai superato la tua quota di utilizzo API. Attendi qualche minuto."
                 );
             }
-             // For other generic API errors
+            // For other generic API errors
             throw new Error(`Errore AI: ${msg}`);
         }
-        
+
         throw new Error("Errore sconosciuto durante la generazione.");
     }
 };
