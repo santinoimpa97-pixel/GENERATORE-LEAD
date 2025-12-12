@@ -17,7 +17,8 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
         };
     }, [onClose]);
 
-    const baseClasses = "fixed bottom-5 right-5 p-4 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-fade-in-up";
+    // Update: Increased z-index to z-[100] to ensure it appears above modals (which are z-50 or z-[60/70])
+    const baseClasses = "fixed bottom-5 right-5 p-4 rounded-lg shadow-lg flex items-center gap-3 z-[100] animate-fade-in-up";
     const typeClasses = {
         success: "bg-green-500 text-white",
         error: "bg-red-500 text-white",
