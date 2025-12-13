@@ -82,7 +82,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     config: {
                         systemInstruction: systemInstruction,
                         // responseMimeType: 'application/json', // NON SUPPORTATO CON I TOOLS
-                        tools: [{ googleSearch: {} }],
+                        // tools: [{ googleSearch: {} }], // DISABILITATO TEMPORANEAMENTE PER RIPRISTINARE FUNZIONAMENTO 2.5
                     },
                 });
                 break; // Se ha successo, esci dal ciclo
