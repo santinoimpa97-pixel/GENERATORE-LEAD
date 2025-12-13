@@ -71,7 +71,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
             try {
                 attempt++;
                 response = await ai.models.generateContent({
-                    model: "gemini-1.5-pro",
+                    model: "gemini-2.5-flash",
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
@@ -166,23 +166,6 @@ export const generateLeads = async (query: string, count: number, existingLeads:
 
         if (error instanceof Error) {
             const msg = error.message || '';
-
-            // DIAGNOSTICA MODELLI: Se il modello non viene trovato, proviamo a elencare quelli disponibili
-            if (msg.includes('404') || msg.includes('not found')) {
-                try {
-                    // Tentativo disperato di elencare i modelli
-                    const modelsResponse = await ai!.models.list();
-                    const modelNames: string[] = [];
-                    // @ts-ignore
-                    for await (const m of modelsResponse) {
-                        modelNames.push(m.name || m.displayName);
-                    }
-                    throw new Error(`Modello non trovato. Modelli disponibili per la tua chiave: ${modelNames.join(', ')}`);
-                } catch (listError: any) {
-                    const listMsg = listError.message || String(listError);
-                    throw new Error(`Modello non trovato e impossibile elencare i modelli. Errore List: ${listMsg}. Errore Originale: ${msg}`);
-                }
-            }
 
             if (msg.includes('Internal error') || msg.includes('500') || msg.includes('INTERNAL')) {
                 throw new Error(
