@@ -71,11 +71,11 @@ export const generateLeads = async (query: string, count: number, existingLeads:
             try {
                 attempt++;
                 response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash",
+                    model: "gemini-2.5-pro",
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
-                        // tools: [{ googleSearch: {} }], // DISABILITATO: Base sicura al 100%
+                        tools: [{ googleSearch: {} }],
                     },
                 });
                 break; // Se ha successo, esci dal ciclo
