@@ -124,14 +124,30 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         }
 
         if (!response.text) {
-            if (response.candidates && response.candidates.length > 0) {
-                console.warn("Risposta con candidati ma senza testo. Grounding metadata:", response.candidates[0].groundingMetadata);
-                throw new Error('empty_response_with_candidates');
+            // Tentativo di estrarre il testo dai candidati se response.text è vuoto
+            const candidate = response.candidates?.[0];
+            if (candidate) {
+                // Prova a estrarre testo dalle parti
+                const parts = candidate.content?.parts;
+                if (parts && parts.length > 0) {
+                    const textFromParts = parts.map((p: any) => p.text || '').join('').trim();
+                    if (textFromParts) {
+                        // Usa il testo estratto dalle parti
+                        (response as any)._extractedText = textFromParts;
+                    } else {
+                        console.warn("Risposta con candidati ma senza testo. Candidato:", JSON.stringify(candidate));
+                        throw new Error(`empty_response_with_candidates: ${JSON.stringify(candidate.finishReason || 'unknown')}`);
+                    }
+                } else {
+                    console.warn("Risposta con candidati ma senza parti. Grounding metadata:", candidate.groundingMetadata);
+                    throw new Error('empty_response_with_candidates');
+                }
+            } else {
+                throw new Error('empty_response');
             }
-            throw new Error('empty_response');
         }
 
-        const text = response.text.trim();
+        const text = (response.text || (response as any)._extractedText || '').trim();
 
         if (text === 'no_new_leads_found') {
             throw new Error('no_new_leads_found');
