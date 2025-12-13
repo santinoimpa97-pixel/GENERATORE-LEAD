@@ -141,7 +141,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     }
                 } else {
                     console.warn("Risposta con candidati ma senza parti. Grounding metadata:", candidate.groundingMetadata);
-                    throw new Error('empty_response_with_candidates');
+                    throw new Error(`empty_response_with_candidates: FULL_DUMP: ${JSON.stringify(candidate)}`);
                 }
             } else {
                 throw new Error('empty_response');
@@ -214,9 +214,9 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     `La generazione è stata interrotta (Codice: ${reason}). Riprova.`
                 );
             }
-            if (msg === 'empty_response' || msg === 'empty_response_with_candidates') {
+            if (msg === 'empty_response' || msg.includes('empty_response_with_candidates')) {
                 throw new Error(
-                    "L'AI non ha restituito dati leggibili. Potrebbe aver provato a cercare senza successo. Riprova."
+                    `L'AI non ha restituito dati leggibili. DUMP: ${msg.replace('empty_response_with_candidates:', '')}`
                 );
             }
             if (msg === 'no_new_leads_found') {
