@@ -45,11 +45,9 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         *   **B2B Focus:** Privilegia contatti aziendali pubblici.
         *   **Settori Validi:** [${validSectors}]. Usa 'Altro' se incerto.
 
-        FORMATO RISPOSTA:
-        Restituisci ESCLUSIVAMENTE un array JSON valido [ ... ].
-        NON usare blocchi markdown (\`\`\`json).
-        NON scrivere testo introduttivo (es. "Ecco i lead...").
-        Se non trovi NUOVI lead validi dopo la ricerca, restituisci esattamente la stringa: "no_new_leads_found".
+        FORMATO RISPOSTA (IMPORTANTE):
+        Il tuo output DEVE contenere un array JSON valido [ ... ].
+        Puoi includere testo prima o dopo il JSON se necessario, ma il cuore della risposta deve essere il JSON.
 
         SCHEMA OGGETTO LEAD:
         {
