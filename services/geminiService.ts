@@ -75,7 +75,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
-                        // tools: [{ googleSearch: {} }], // TEMPORANEAMENTE DISABILITATO PER TEST
+                        tools: [{ googleSearch: {} }],
                     },
                 });
                 break; // Se ha successo, esci dal ciclo
@@ -201,16 +201,16 @@ export const generateLeads = async (query: string, count: number, existingLeads:
             }
             if (msg.includes('API key not valid') || msg.includes('leaked')) {
                 throw new Error(
-                    "Errore API Key: La chiave è stata revocata o non è valida. Controlla le impostazioni di Vercel."
+                    `Errore API Key: La chiave è stata revocata o non è valida. Dettaglio: ${msg}`
                 );
             }
-            if (msg.toLowerCase().includes('quota')) {
+            if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('rate') || msg.includes('429')) {
                 throw new Error(
-                    "Hai superato la tua quota di utilizzo API. Attendi qualche minuto."
+                    `Limite API raggiunto. Errore originale: ${msg}`
                 );
             }
-            // For other generic API errors
-            throw new Error(`Errore AI: ${msg}`);
+            // For other generic API errors - MOSTRA L'ERRORE ORIGINALE
+            throw new Error(`Errore Gemini: ${msg}`);
         }
 
         throw new Error("Errore sconosciuto durante la generazione.");
