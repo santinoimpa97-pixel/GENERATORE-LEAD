@@ -75,7 +75,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
-                        // tools: [{ googleSearch: {} }], // DISABILITATO: Base sicura al 100%
+                        tools: [{ googleSearch: {} }],
                     },
                 });
                 break; // Se ha successo, esci dal ciclo
