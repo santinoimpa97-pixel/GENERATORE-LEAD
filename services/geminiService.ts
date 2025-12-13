@@ -83,7 +83,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
-                        responseMimeType: 'application/json',
+                        // responseMimeType: 'application/json', // NON SUPPORTATO CON I TOOLS
                         tools: [{ googleSearch: {} }],
                     },
                 });
