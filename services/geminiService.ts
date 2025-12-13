@@ -79,7 +79,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
             try {
                 attempt++;
                 response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash",
+                    model: "gemini-2.0-flash",
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
