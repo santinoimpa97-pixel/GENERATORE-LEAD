@@ -71,7 +71,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
             try {
                 attempt++;
                 response = await ai.models.generateContent({
-                    model: "gemini-1.5-flash-001",
+                    model: "gemini-1.5-pro",
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
@@ -178,8 +178,9 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                         modelNames.push(m.name || m.displayName);
                     }
                     throw new Error(`Modello non trovato. Modelli disponibili per la tua chiave: ${modelNames.join(', ')}`);
-                } catch (listError) {
-                    throw new Error(`Modello non trovato e impossibile elencare i modelli disponibili. Errore originale: ${msg}`);
+                } catch (listError: any) {
+                    const listMsg = listError.message || String(listError);
+                    throw new Error(`Modello non trovato e impossibile elencare i modelli. Errore List: ${listMsg}. Errore Originale: ${msg}`);
                 }
             }
 
