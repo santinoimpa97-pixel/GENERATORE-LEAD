@@ -11,7 +11,7 @@ export const geminiConnectionError = !apiKey
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-export const generateLeads = async (query: string, count: number, existingLeads: { name: string; location: string }[], whatsAppOnly: boolean = false): Promise<Partial<Lead>[]> => {
+export const generateLeads = async (query: string, count: number, existingLeads: { name: string; location: string }[]): Promise<Partial<Lead>[]> => {
     if (!ai) {
         throw new Error("La chiave API di Gemini non è configurata. Imposta API_KEY nelle tue variabili d'ambiente su Vercel.");
     }
@@ -21,23 +21,15 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         ? `IMPORTANTE: Escludi ASSOLUTAMENTE questi lead già presenti (non restituirli): ${JSON.stringify(existingLeads)}.`
         : '';
 
-    // Istruzione WhatsApp dinamica basata sul toggle
-    const whatsAppInstruction = whatsAppOnly
-        ? `3.  **ESTRAZIONE SOLO WHATSAPP:** 
-            - **IGNORA COMPLETAMENTE** le aziende che hanno solo numero fisso.
-            - Restituisci SOLO aziende che hanno un numero di **cellulare** (prefisso +39 3xx) o indicato come **WhatsApp**.
-            - Se un'azienda non ha cellulare/WhatsApp visibile, NON includerla nei risultati.`
-        : `3.  **ESTRAZIONE:** 
-            - Se un'azienda ha sia un numero fisso che un cellulare, **INSERISCI IL CELLULARE** nel campo 'phone'.
-            - Se trovi solo il fisso, inserisci quello, ma dai priorità ai risultati con cellulare.`;
-
     const systemInstruction = `
         Sei un assistente AI specializzato nella Lead Generation B2B con focus su **WhatsApp Marketing**.
 
         PROTOCOLLO OPERATIVO OBBLIGATORIO:
         1.  **RICERCA:** Utilizza ORA lo strumento 'googleSearch' per cercare aziende reali. Cerca specificamente pagine "Contatti", footer di siti web e profili social per trovare numeri di telefono.
         2.  **FOCUS WHATSAPP:** Il tuo obiettivo principale è trovare numeri di **cellulare** o numeri indicati come **WhatsApp**. Cerca prefissi mobili (es. +39 3...) o diciture "scrivici su WhatsApp".
-        ${whatsAppInstruction}
+        3.  **ESTRAZIONE:** 
+            - Se un'azienda ha sia un numero fisso che un cellulare, **INSERISCI IL CELLULARE** nel campo 'phone'.
+            - Se trovi solo il fisso, inserisci quello, ma dai priorità ai risultati con cellulare.
         4.  **OUTPUT:** Genera un array JSON con i risultati.
 
         CRITERI DI QUALITÀ:
@@ -45,9 +37,11 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         *   **B2B Focus:** Privilegia contatti aziendali pubblici.
         *   **Settori Validi:** [${validSectors}]. Usa 'Altro' se incerto.
 
-        FORMATO RISPOSTA (IMPORTANTE):
-        Il tuo output DEVE contenere un array JSON valido [ ... ].
-        Puoi includere testo prima o dopo il JSON se necessario, ma il cuore della risposta deve essere il JSON.
+        FORMATO RISPOSTA:
+        Restituisci ESCLUSIVAMENTE un array JSON valido [ ... ].
+        NON usare blocchi markdown (\`\`\`json).
+        NON scrivere testo introduttivo (es. "Ecco i lead...").
+        Se non trovi NUOVI lead validi dopo la ricerca, restituisci esattamente la stringa: "no_new_leads_found".
 
         SCHEMA OGGETTO LEAD:
         {
@@ -55,7 +49,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
           "location": "Indirizzo/Città",
           "website": "URL Sito",
           "description": "Breve descrizione attività",
-          "phone": "Telefono (${whatsAppOnly ? 'OBBLIGATORIO: Solo Cellulare/WhatsApp' : 'Preferibilmente Cellulare/WhatsApp'})",
+          "phone": "Telefono (Preferibilmente Cellulare/WhatsApp)",
           "email": "Email",
           "sector": "Settore"
         }
@@ -64,12 +58,11 @@ export const generateLeads = async (query: string, count: number, existingLeads:
     const userPrompt = `
         Trova ${count} lead B2B per: "${query}".
         ${exclusionList}
-        Usa Google Search. ${whatsAppOnly ? 'MOSTRA SOLO aziende con numero di cellulare o WhatsApp visibile. Ignora quelle con solo fisso.' : 'Dai priorità assoluta alle aziende che mostrano un numero di **cellulare** o **WhatsApp** visibile.'}
+        Usa Google Search. Dai priorità assoluta alle aziende che mostrano un numero di **cellulare** o **WhatsApp** visibile.
     `;
 
-    let response: any;
-
     try {
+        let response;
         let attempt = 0;
         const maxRetries = 3;
 
@@ -82,8 +75,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
-                        // responseMimeType: 'application/json', // NON SUPPORTATO CON I TOOLS
-                        // tools: [{ googleSearch: {} }], // DISABILITATO SU RICHIESTA UTENTE PER STABILITÀ
+                        // tools: [{ googleSearch: {} }], // DISABILITATO: Base sicura al 100%
                     },
                 });
                 break; // Se ha successo, esci dal ciclo
@@ -124,32 +116,16 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         }
 
         if (!response.text) {
-            // Tentativo di estrarre il testo dai candidati se response.text è vuoto
-            const candidate = response.candidates?.[0];
-            if (candidate) {
-                // Prova a estrarre testo dalle parti
-                const parts = candidate.content?.parts;
-                if (parts && parts.length > 0) {
-                    const textFromParts = parts.map((p: any) => p.text || '').join('').trim();
-                    if (textFromParts) {
-                        // Usa il testo estratto dalle parti
-                        (response as any)._extractedText = textFromParts;
-                    } else {
-                        console.warn("Risposta con candidati ma senza testo. Candidato:", JSON.stringify(candidate));
-                        throw new Error(`empty_response_with_candidates: ${JSON.stringify(candidate.finishReason || 'unknown')}`);
-                    }
-                } else {
-                    console.warn("Risposta con candidati ma senza parti. Grounding metadata:", candidate.groundingMetadata);
-                    throw new Error(`empty_response_with_candidates: FULL_DUMP: ${JSON.stringify(candidate)}`);
-                }
-            } else {
-                throw new Error('empty_response');
+            if (response.candidates && response.candidates.length > 0) {
+                console.warn("Risposta con candidati ma senza testo. Grounding metadata:", response.candidates[0].groundingMetadata);
+                throw new Error('empty_response_with_candidates');
             }
+            throw new Error('empty_response');
         }
 
-        const text = (response.text || (response as any)._extractedText || '').trim();
+        const text = response.text.trim();
 
-        if (text.includes('no_new_leads_found')) {
+        if (text === 'no_new_leads_found') {
             throw new Error('no_new_leads_found');
         }
 
@@ -158,8 +134,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         const endIndex = text.lastIndexOf(']');
 
         if (startIndex === -1 || endIndex === -1) {
-            console.error("JSON Start/End not found in text:", text);
-            throw new SyntaxError("Start/End bracket not found");
+            throw new SyntaxError("L'AI ha restituito del testo ma non è un array JSON valido.");
         }
 
         const jsonString = text.substring(startIndex, endIndex + 1);
@@ -184,9 +159,8 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         console.error("Errore durante la generazione di lead con Gemini:", error);
 
         if (error instanceof SyntaxError) {
-            const rawText = (response?.text || 'No Text Available').substring(0, 200);
             throw new Error(
-                `L'AI ha risposto in un formato non valido. Raw Text Start: "${rawText}..."`
+                "L'AI ha risposto in un formato non valido (probabile testo extra). Riprova."
             );
         }
 
@@ -215,9 +189,9 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     `La generazione è stata interrotta (Codice: ${reason}). Riprova.`
                 );
             }
-            if (msg === 'empty_response' || msg.includes('empty_response_with_candidates')) {
+            if (msg === 'empty_response' || msg === 'empty_response_with_candidates') {
                 throw new Error(
-                    `L'AI non ha restituito dati leggibili. DUMP: ${msg.replace('empty_response_with_candidates:', '')}`
+                    "L'AI non ha restituito dati leggibili. Potrebbe aver provato a cercare senza successo. Riprova."
                 );
             }
             if (msg === 'no_new_leads_found') {
