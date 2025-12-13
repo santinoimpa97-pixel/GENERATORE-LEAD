@@ -67,8 +67,9 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         Usa Google Search. ${whatsAppOnly ? 'MOSTRA SOLO aziende con numero di cellulare o WhatsApp visibile. Ignora quelle con solo fisso.' : 'Dai priorità assoluta alle aziende che mostrano un numero di **cellulare** o **WhatsApp** visibile.'}
     `;
 
+    let response: any;
+
     try {
-        let response;
         let attempt = 0;
         const maxRetries = 3;
 
@@ -148,7 +149,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
 
         const text = (response.text || (response as any)._extractedText || '').trim();
 
-        if (text === 'no_new_leads_found') {
+        if (text.includes('no_new_leads_found')) {
             throw new Error('no_new_leads_found');
         }
 
@@ -157,7 +158,8 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         const endIndex = text.lastIndexOf(']');
 
         if (startIndex === -1 || endIndex === -1) {
-            throw new SyntaxError("L'AI ha restituito del testo ma non è un array JSON valido.");
+            console.error("JSON Start/End not found in text:", text);
+            throw new SyntaxError("Start/End bracket not found");
         }
 
         const jsonString = text.substring(startIndex, endIndex + 1);
@@ -182,8 +184,9 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         console.error("Errore durante la generazione di lead con Gemini:", error);
 
         if (error instanceof SyntaxError) {
+            const rawText = (response?.text || 'No Text Available').substring(0, 200);
             throw new Error(
-                "L'AI ha risposto in un formato non valido (probabile testo extra). Riprova."
+                `L'AI ha risposto in un formato non valido. Raw Text Start: "${rawText}..."`
             );
         }
 
