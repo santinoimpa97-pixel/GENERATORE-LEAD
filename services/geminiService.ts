@@ -77,12 +77,12 @@ export const generateLeads = async (query: string, count: number, existingLeads:
             try {
                 attempt++;
                 response = await ai.models.generateContent({
-                    model: "gemini-2.5-flash",
+                    model: "gemini-2.0-flash",
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
                         // responseMimeType: 'application/json', // NON SUPPORTATO CON I TOOLS
-                        // tools: [{ googleSearch: {} }], // DISABILITATO TEMPORANEAMENTE PER RIPRISTINARE FUNZIONAMENTO 2.5
+                        tools: [{ googleSearch: {} }],
                     },
                 });
                 break; // Se ha successo, esci dal ciclo
