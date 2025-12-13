@@ -83,7 +83,8 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
-                        tools: [{ googleSearch: {} }],
+                        responseMimeType: 'application/json',
+                        // tools: [{ googleSearch: {} }], // DISABILITATO TEMPORANEAMENTE PER DEBUG
                     },
                 });
                 break; // Se ha successo, esci dal ciclo
