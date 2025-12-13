@@ -84,7 +84,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
                     config: {
                         systemInstruction: systemInstruction,
                         responseMimeType: 'application/json',
-                        // tools: [{ googleSearch: {} }], // DISABILITATO TEMPORANEAMENTE PER DEBUG
+                        tools: [{ googleSearch: {} }],
                     },
                 });
                 break; // Se ha successo, esci dal ciclo
