@@ -15,6 +15,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
     const [count, setCount] = useState(5);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [whatsAppOnly, setWhatsAppOnly] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -22,7 +23,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
             setError('Il campo di ricerca è obbligatorio.');
             return;
         }
-        
+
         setIsLoading(true);
         setError(null);
         onGenerationStart();
@@ -30,7 +31,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
         const fullQuery = location ? `${query} a ${location}` : query;
 
         try {
-            const newLeads = await generateLeads(fullQuery, count, existingLeads);
+            const newLeads = await generateLeads(fullQuery, count, existingLeads, whatsAppOnly);
             onLeadsGenerated(newLeads);
             onGenerationEnd(true, `${newLeads.length} nuovi lead generati con successo!`);
         } catch (err) {
@@ -62,7 +63,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
                         />
                     </div>
                     <div>
-                         <label htmlFor="count" className="block text-sm font-medium text-muted-foreground mb-1">Quantità</label>
+                        <label htmlFor="count" className="block text-sm font-medium text-muted-foreground mb-1">Quantità</label>
                         <input
                             type="number"
                             id="count"
@@ -87,6 +88,32 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
                         disabled={isLoading}
                     />
                 </div>
+
+                {/* WhatsApp Priority Toggle */}
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border border-input">
+                    <div className="flex items-center gap-2">
+                        <i className="fab fa-whatsapp text-green-500 text-xl"></i>
+                        <div>
+                            <p className="text-sm font-medium text-foreground">Solo WhatsApp/Cellulare</p>
+                            <p className="text-xs text-muted-foreground">Ignora aziende con solo numeri fissi</p>
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setWhatsAppOnly(!whatsAppOnly)}
+                        disabled={isLoading}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 ${whatsAppOnly ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+                            }`}
+                        role="switch"
+                        aria-checked={whatsAppOnly}
+                    >
+                        <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 ease-in-out ${whatsAppOnly ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                        />
+                    </button>
+                </div>
+
                 <button
                     type="submit"
                     className="w-full bg-primary text-primary-foreground font-semibold py-2.5 px-4 rounded-lg hover:bg-primary/90 transition duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait"

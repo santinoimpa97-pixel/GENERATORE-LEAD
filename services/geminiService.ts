@@ -11,7 +11,7 @@ export const geminiConnectionError = !apiKey
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-export const generateLeads = async (query: string, count: number, existingLeads: { name: string; location: string }[]): Promise<Partial<Lead>[]> => {
+export const generateLeads = async (query: string, count: number, existingLeads: { name: string; location: string }[], whatsAppOnly: boolean = false): Promise<Partial<Lead>[]> => {
     if (!ai) {
         throw new Error("La chiave API di Gemini non è configurata. Imposta API_KEY nelle tue variabili d'ambiente su Vercel.");
     }
@@ -21,15 +21,23 @@ export const generateLeads = async (query: string, count: number, existingLeads:
         ? `IMPORTANTE: Escludi ASSOLUTAMENTE questi lead già presenti (non restituirli): ${JSON.stringify(existingLeads)}.`
         : '';
 
+    // Istruzione WhatsApp dinamica basata sul toggle
+    const whatsAppInstruction = whatsAppOnly
+        ? `3.  **ESTRAZIONE SOLO WHATSAPP:** 
+            - **IGNORA COMPLETAMENTE** le aziende che hanno solo numero fisso.
+            - Restituisci SOLO aziende che hanno un numero di **cellulare** (prefisso +39 3xx) o indicato come **WhatsApp**.
+            - Se un'azienda non ha cellulare/WhatsApp visibile, NON includerla nei risultati.`
+        : `3.  **ESTRAZIONE:** 
+            - Se un'azienda ha sia un numero fisso che un cellulare, **INSERISCI IL CELLULARE** nel campo 'phone'.
+            - Se trovi solo il fisso, inserisci quello, ma dai priorità ai risultati con cellulare.`;
+
     const systemInstruction = `
         Sei un assistente AI specializzato nella Lead Generation B2B con focus su **WhatsApp Marketing**.
 
         PROTOCOLLO OPERATIVO OBBLIGATORIO:
         1.  **RICERCA:** Utilizza ORA lo strumento 'googleSearch' per cercare aziende reali. Cerca specificamente pagine "Contatti", footer di siti web e profili social per trovare numeri di telefono.
         2.  **FOCUS WHATSAPP:** Il tuo obiettivo principale è trovare numeri di **cellulare** o numeri indicati come **WhatsApp**. Cerca prefissi mobili (es. +39 3...) o diciture "scrivici su WhatsApp".
-        3.  **ESTRAZIONE:** 
-            - Se un'azienda ha sia un numero fisso che un cellulare, **INSERISCI IL CELLULARE** nel campo 'phone'.
-            - Se trovi solo il fisso, inserisci quello, ma dai priorità ai risultati con cellulare.
+        ${whatsAppInstruction}
         4.  **OUTPUT:** Genera un array JSON con i risultati.
 
         CRITERI DI QUALITÀ:
@@ -49,7 +57,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
           "location": "Indirizzo/Città",
           "website": "URL Sito",
           "description": "Breve descrizione attività",
-          "phone": "Telefono (Preferibilmente Cellulare/WhatsApp)",
+          "phone": "Telefono (${whatsAppOnly ? 'OBBLIGATORIO: Solo Cellulare/WhatsApp' : 'Preferibilmente Cellulare/WhatsApp'})",
           "email": "Email",
           "sector": "Settore"
         }
@@ -58,7 +66,7 @@ export const generateLeads = async (query: string, count: number, existingLeads:
     const userPrompt = `
         Trova ${count} lead B2B per: "${query}".
         ${exclusionList}
-        Usa Google Search. Dai priorità assoluta alle aziende che mostrano un numero di **cellulare** o **WhatsApp** visibile.
+        Usa Google Search. ${whatsAppOnly ? 'MOSTRA SOLO aziende con numero di cellulare o WhatsApp visibile. Ignora quelle con solo fisso.' : 'Dai priorità assoluta alle aziende che mostrano un numero di **cellulare** o **WhatsApp** visibile.'}
     `;
 
     try {
