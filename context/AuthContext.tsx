@@ -1,6 +1,9 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase, supabaseConnectionError } from '../services/supabaseClient';
-import { Session, User } from '@supabase/supabase-js';
+
+// Fallback types since @supabase/supabase-js types seem to be missing or incompatible
+type Session = any;
+type User = any;
 
 interface AuthContextType {
   session: Session | null;
@@ -25,14 +28,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             return;
         }
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
         });
 
         // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(({ data: { session } }: any) => {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);

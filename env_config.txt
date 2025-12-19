@@ -1,6 +1,7 @@
-# COPIA QUESTI DATI NELLE IMPOSTAZIONI DEL TUO HOSTING (Vercel, Netlify, StackBlitz)
-# NON rinominare questo file in .env se sei online, usa il pannello "Environment Variables" del tuo servizio.
+# IMPORTANTE PER VERCEL / NETLIFY / CLOUD
+# Le variabili devono avere il prefisso "VITE_" per essere visibili al browser.
+# Vai nelle impostazioni del tuo hosting e usa QUESTI nomi esatti:
 
-API_KEY=INSERISCI_QUI_LA_TUA_GEMINI_API_KEY
-SUPABASE_URL=INSERISCI_QUI_IL_TUO_SUPABASE_URL
-SUPABASE_ANON_KEY=INSERISCI_QUI_LA_TUA_SUPABASE_ANON_KEY
+VITE_API_KEY=INSERISCI_QUI_LA_TUA_GEMINI_API_KEY
+VITE_SUPABASE_URL=INSERISCI_QUI_IL_TUO_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY=INSERISCI_QUI_LA_TUA_SUPABASE_ANON_KEY
