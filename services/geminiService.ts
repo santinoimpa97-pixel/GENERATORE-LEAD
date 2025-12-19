@@ -1,64 +1,42 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Lead, Source, Sector } from '../types';
 
-// Helper to safely get API Key
-const getApiKey = (): string | undefined => {
-    let key: string | undefined = undefined;
+/**
+ * The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+ * Use this string directly when initializing the @google/genai client instance.
+ */
+const API_KEY = process.env.API_KEY;
 
-    // 1. Try custom global object
-    // @ts-ignore
-    if (typeof window !== 'undefined' && window.__APP_CONFIG__) {
-        // @ts-ignore
-        key = window.__APP_CONFIG__.API_KEY || window.__APP_CONFIG__.VITE_API_KEY;
-    }
+// Check if API key is present and not a placeholder
+const isApiKeyValid = !!API_KEY && API_KEY.length > 10 && !API_KEY.includes('INSERISCI_QUI');
 
-    if (key && !key.includes('INSERISCI_QUI')) return key;
+export const geminiConnectionError = isApiKeyValid
+    ? null
+    : "Chiave API Gemini non trovata. Verifica l'ambiente.";
 
-    // 2. Try window.process
-    try {
-        // @ts-ignore
-        if (typeof window !== 'undefined' && window.process && window.process.env) {
-            // @ts-ignore
-            key = window.process.env.API_KEY || window.process.env.VITE_API_KEY;
-        }
-    } catch (e) {}
-
-    if (key && !key.includes('INSERISCI_QUI')) return key;
-
-    // 3. Try import.meta.env
-    try {
-        // @ts-ignore
-        if (typeof import.meta !== 'undefined' && import.meta.env) {
-            // @ts-ignore
-            key = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
-        }
-    } catch (e) {}
+/**
+ * Generates leads using Gemini AI with Google Search grounding.
+ */
+export const generateLeads = async (
+    query: string, 
+    count: number, 
+    existingLeads: { name: string; location: string }[]
+): Promise<Partial<Lead>[]> => {
     
-    if (key && key.includes('INSERISCI_QUI')) return undefined;
-
-    return key;
-};
-
-const API_KEY = getApiKey();
-
-const isApiKeyValid = API_KEY && API_KEY.length > 10;
-
-export const geminiConnectionError = !isApiKeyValid
-    ? "Chiave API Gemini non trovata. Controlla env.js." 
-    : null;
-
-const ai = isApiKeyValid ? new GoogleGenAI({ apiKey: API_KEY! }) : null;
-
-export const generateLeads = async (query: string, count: number, existingLeads: { name: string; location: string }[]): Promise<Partial<Lead>[]> => {
-    if (!ai) {
+    if (!isApiKeyValid) {
         throw new Error("Chiave API Gemini mancante o non valida.");
     }
+
+    // Creating a new instance right before the call as per guidelines for Gemini 3 series
+    const ai = new GoogleGenAI({ apiKey: API_KEY! });
     
     const validSectors = Object.values(Sector).join(', ');
     const exclusionList = existingLeads.length > 0 
         ? `IMPORTANTE: Escludi ASSOLUTAMENTE questi lead già presenti (non restituirli): ${JSON.stringify(existingLeads)}.`
         : '';
 
+    // Fix: Escaping triple backticks inside the template literal to prevent breaking the string.
     const systemInstruction = `
         Sei un assistente AI specializzato nella Lead Generation B2B con focus su **WhatsApp Marketing**.
 
@@ -77,8 +55,8 @@ export const generateLeads = async (query: string, count: number, existingLeads:
 
         FORMATO RISPOSTA:
         Restituisci ESCLUSIVAMENTE un array JSON valido [ ... ].
-        NON usare blocchi markdown (\`\`\`json).
-        NON scrivere testo introduttivo (es. "Ecco i lead...").
+        NON usare blocchi markdown (es. \` \` \`json).
+        NON scrivere testo introduttivo.
         Se non trovi NUOVI lead validi dopo la ricerca, restituisci esattamente la stringa: "no_new_leads_found".
 
         SCHEMA OGGETTO LEAD:
@@ -100,90 +78,105 @@ export const generateLeads = async (query: string, count: number, existingLeads:
     `;
 
     try {
-        let response;
+        let finalResponse = null;
         let attempt = 0;
-        const maxRetries = 3;
+        const maxRetries = 5;
 
-        while (true) {
+        while (attempt < maxRetries) {
             try {
                 attempt++;
-                response = await ai.models.generateContent({
-                    model: "gemini-3-pro-preview",
+                // Using gemini-3-flash-preview as per task requirements
+                const response = await ai.models.generateContent({
+                    model: "gemini-3-flash-preview",
                     contents: userPrompt,
                     config: {
                         systemInstruction: systemInstruction,
                         tools: [{ googleSearch: {} }],
                     },
                 });
+                
+                finalResponse = response;
                 break; 
             } catch (apiError: any) {
                 const msg = apiError.message || JSON.stringify(apiError);
                 console.warn(`Tentativo ${attempt} Gemini fallito:`, msg);
 
-                const isRetriable = msg.includes('500') || 
+                const isQuotaError = msg.includes('429') || msg.includes('quota') || msg.includes('exhausted');
+                const isRetriable = isQuotaError || 
+                                    msg.includes('500') || 
                                     msg.includes('503') || 
                                     msg.includes('Internal error') || 
                                     msg.includes('INTERNAL') ||
                                     msg.includes('Overloaded') ||
-                                    msg.includes('fetch'); // Retry on fetch errors too
+                                    msg.includes('fetch');
 
                 if (isRetriable && attempt < maxRetries) {
-                    const delay = Math.pow(2, attempt) * 1000;
+                    const baseDelay = isQuotaError ? 3000 : 1000;
+                    const delay = Math.pow(2, attempt) * baseDelay;
+                    console.info(`Riprovo tra ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                     continue;
+                }
+                
+                if (isQuotaError) {
+                    throw new Error("Quota API Gemini esaurita. Attendi qualche minuto.");
                 }
                 throw apiError;
             }
         }
 
-        if (response.candidates?.[0]?.finishReason && response.candidates[0].finishReason !== 'STOP') {
-            const reason = response.candidates[0].finishReason;
-            if (reason === 'SAFETY') throw new Error(`blocked:SAFETY`);
-            if (reason === 'MALFORMED_FUNCTION_CALL') throw new Error(`malformed_function_call`);
-            throw new Error(`interrupted:${reason}`);
-        }
-        
-        if (!response.text) {
-             if (response.candidates && response.candidates.length > 0) {
-                throw new Error('empty_response_with_candidates');
-            }
-            throw new Error('empty_response');
+        if (!finalResponse) {
+            throw new Error("Impossibile ottenere una risposta dall'AI dopo diversi tentativi.");
         }
 
-        const text = response.text.trim();
-        if (text === 'no_new_leads_found') throw new Error('no_new_leads_found');
+        if (finalResponse.candidates?.[0]?.finishReason && finalResponse.candidates[0].finishReason !== 'STOP') {
+            const reason = finalResponse.candidates[0].finishReason;
+            if (reason === 'SAFETY') throw new Error("Il contenuto è stato bloccato dai filtri di sicurezza AI.");
+            throw new Error(`Generazione interrotta: ${reason}`);
+        }
         
-        const startIndex = text.indexOf('[');
-        const endIndex = text.lastIndexOf(']');
+        // Correct usage of .text property (not a method)
+        const textOutput = finalResponse.text;
+        if (!textOutput) {
+            throw new Error('L\'AI ha restituito una risposta vuota.');
+        }
+
+        const trimmedText = textOutput.trim();
+        if (trimmedText === 'no_new_leads_found') throw new Error('no_new_leads_found');
+        
+        const startIndex = trimmedText.indexOf('[');
+        const endIndex = trimmedText.lastIndexOf(']');
 
         if (startIndex === -1 || endIndex === -1) {
              throw new SyntaxError("L'AI ha restituito del testo ma non è un array JSON valido.");
         }
 
-        const jsonString = text.substring(startIndex, endIndex + 1);
+        const jsonString = trimmedText.substring(startIndex, endIndex + 1);
         const parsedLeads: Partial<Lead>[] = JSON.parse(jsonString);
         
-        const groundingMetadata = response.candidates?.[0]?.groundingMetadata;
-        const sources: Source[] | undefined = groundingMetadata?.groundingChunks
-            ?.map((chunk: any) => ({
+        // Extracting website URLs from grounding chunks as per guidelines
+        const groundingMetadata = finalResponse.candidates?.[0]?.groundingMetadata;
+        const sources: Source[] = (groundingMetadata?.groundingChunks || [])
+            .map((chunk: any) => ({
                 uri: chunk.web?.uri,
                 title: chunk.web?.title,
             }))
-            .filter((source: any): source is Source => source.uri);
+            .filter((source: any): source is Source => !!source.uri);
 
         return parsedLeads.map(lead => ({
             ...lead,
             sector: lead.sector || Sector.OTHER,
-            sources: sources || [],
+            sources: sources.length > 0 ? sources : [],
         }));
 
     } catch (error) {
         console.error("Errore Gemini:", error);
-        if (error instanceof SyntaxError) throw new Error("Risposta AI non valida. Riprova.");
-        if (error instanceof Error) {
-            if (error.message.includes('API key')) throw new Error("API Key non valida o revocata.");
-            throw new Error(`Errore AI: ${error.message}`);
+        if (error instanceof SyntaxError) {
+            throw new Error("Risposta AI malformata. Riprova con una ricerca più specifica.");
         }
-        throw new Error("Errore sconosciuto.");
+        if (error instanceof Error) {
+            throw error;
+        }
+        throw new Error("Errore sconosciuto nella generazione dei lead.");
     }
 };
