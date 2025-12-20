@@ -7,18 +7,31 @@
     <!-- Configurazione Globale per Ambiente Browser -->
     <script>
       (function() {
+        // Chiave API fornita per il funzionamento dell'app
+        const API_KEY = "AIzaSyADL0PbzNrxyFNcupciKV6UXkP8FDctLhg";
+        
         const config = {
-          API_KEY: "AIzaSyADL0PbzNrxyFNcupciKV6UXkP8FDctLhg",
-          VITE_API_KEY: "AIzaSyADL0PbzNrxyFNcupciKV6UXkP8FDctLhg",
+          API_KEY: API_KEY,
+          VITE_API_KEY: API_KEY,
           VITE_SUPABASE_URL: "https://eggbhehdbehfngqzxyzl.supabase.co",
           VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZ2JoZWhkYmVoZm5ncXp4eXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3Nzk2NTYsImV4cCI6MjA3NTM1NTY1Nn0.IpDozjWedurgoBeMX5Bi0dX4KEqDyQlN1PsNjyNXuMQ"
         };
+        
+        // Esposizione globale per accesso diretto
         window.__APP_CONFIG__ = config;
-        // Polyfill universale per process.env richiesto dalle librerie Google
+        
+        // Polyfill per librerie che si aspettano process.env (Gemini SDK)
         window.process = window.process || {};
         window.process.env = window.process.env || {};
+        
+        // Iniezione forzata delle chiavi
+        window.process.env.API_KEY = API_KEY;
+        window.process.env.VITE_API_KEY = API_KEY;
+        
+        // Copia di tutta la config
         Object.assign(window.process.env, config);
-        console.log("[Config] Variabili d'ambiente iniettate con successo.");
+        
+        console.log("[Config] Ambiente inizializzato con successo.");
       })();
     </script>
     <script src="https://cdn.tailwindcss.com"></script>

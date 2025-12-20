@@ -2,8 +2,35 @@ import { GoogleGenAI } from "@google/genai";
 import { Lead, Source, Sector } from '../types';
 
 /**
+ * Funzione di utilità per recuperare la chiave API in modo resiliente ai bundler.
+ * Alcuni compilatori (Vite/Webpack) sostituiscono process.env.API_KEY a build-time.
+ * Questa funzione garantisce di pescare il valore reale iniettato in index.html a runtime.
+ */
+const getApiKey = (): string | undefined => {
+    // 1. Tenta l'accesso standard (richiesto dalle linee guida)
+    try {
+        if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+            return process.env.API_KEY;
+        }
+    } catch (e) {}
+
+    // 2. Fallback al global scope (window) dove index.html inietta la configurazione
+    const globalConfig = (window as any).__APP_CONFIG__;
+    if (globalConfig && globalConfig.API_KEY) {
+        return globalConfig.API_KEY;
+    }
+
+    // 3. Fallback a window.process (polyfill per browser)
+    const browserProcess = (window as any).process;
+    if (browserProcess?.env?.API_KEY) {
+        return browserProcess.env.API_KEY;
+    }
+
+    return undefined;
+};
+
+/**
  * Generates leads using Gemini AI with Google Search grounding.
- * Strictly follows Google GenAI SDK guidelines for API Key usage.
  */
 export const generateLeads = async (
     query: string, 
@@ -11,32 +38,32 @@ export const generateLeads = async (
     existingLeads: { name: string; location: string }[]
 ): Promise<Partial<Lead>[]> => {
     
-    // REQUIREMENT: Use process.env.API_KEY directly.
-    const apiKey = process.env.API_KEY;
+    const apiKey = getApiKey();
     
     if (!apiKey || apiKey.includes('INSERISCI_QUI') || apiKey.length < 10) {
-        throw new Error("Chiave API Gemini non configurata correttamente nell'ambiente.");
+        throw new Error("Chiave API Gemini non trovata. Assicurati che sia configurata correttamente in Vercel o index.html.");
     }
 
-    // REQUIREMENT: Use new GoogleGenAI({ apiKey: process.env.API_KEY })
+    // Inizializzazione istanza con la chiave recuperata
     const ai = new GoogleGenAI({ apiKey });
     
     const validSectors = Object.values(Sector).join(', ');
     const exclusionList = existingLeads.length > 0 
-        ? `IMPORTANTE: Escludi ASSOLUTAMENTE questi lead già presenti: ${JSON.stringify(existingLeads)}.`
+        ? `Escludi questi lead già presenti: ${JSON.stringify(existingLeads.map(l => l.name))}.`
         : '';
 
     const systemInstruction = `
         Sei un assistente AI specializzato nella Lead Generation B2B.
+        PROTOCOLLO:
         1. RICERCA: Usa 'googleSearch' per trovare aziende reali.
-        2. FOCUS: Trova numeri di cellulare o WhatsApp.
-        3. OUTPUT: Restituisci un array JSON di oggetti lead.
+        2. DATI: Cerca numeri di cellulare o WhatsApp. Non inventare mai i dati.
+        3. OUTPUT: Restituisci ESCLUSIVAMENTE un array JSON di oggetti lead.
         
-        FORMATO RISPOSTA: ESCLUSIVAMENTE un array JSON [ ... ]. 
-        Se non trovi nulla, scrivi: no_new_leads_found.
+        FORMATO RISPOSTA: Array JSON [ ... ]. 
+        Se non trovi nulla di nuovo, scrivi: no_new_leads_found.
     `;
     
-    const userPrompt = `Trova ${count} lead per: "${query}". ${exclusionList} Usa Google Search.`;
+    const userPrompt = `Trova ${count} nuovi lead per: "${query}". ${exclusionList} Usa Google Search.`;
 
     try {
         let finalResponse = null;
@@ -46,7 +73,7 @@ export const generateLeads = async (
         while (attempt < maxRetries) {
             try {
                 attempt++;
-                // Using gemini-3-flash-preview for optimal quota on Vercel
+                // Utilizziamo gemini-3-flash-preview per massimizzare la quota disponibile
                 const response = await ai.models.generateContent({
                     model: "gemini-3-flash-preview",
                     contents: userPrompt,
@@ -60,6 +87,7 @@ export const generateLeads = async (
                 break; 
             } catch (apiError: any) {
                 const msg = apiError.message || "";
+                // Gestione Retry per Quota (429)
                 if ((msg.includes('429') || msg.includes('quota')) && attempt < maxRetries) {
                     await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
                     continue;
@@ -79,7 +107,7 @@ export const generateLeads = async (
         const endIndex = textOutput.lastIndexOf(']');
 
         if (startIndex === -1 || endIndex === -1) {
-             throw new Error("Formato dati AI non valido.");
+             throw new Error("L'AI ha restituito un formato non valido. Riprova tra un istante.");
         }
 
         const jsonString = textOutput.substring(startIndex, endIndex + 1);
@@ -101,6 +129,9 @@ export const generateLeads = async (
 
     } catch (error: any) {
         console.error("Gemini Error:", error);
+        if (error.message?.includes('429')) {
+            throw new Error("Quota API esaurita. Attendi 60 secondi prima di riprovare.");
+        }
         throw error;
     }
 };
