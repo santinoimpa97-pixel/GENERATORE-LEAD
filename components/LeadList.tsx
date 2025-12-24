@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Lead, KanbanColumn } from '../types';
 
@@ -95,6 +96,29 @@ const LeadList: React.FC<LeadListProps> = ({
                                                         <i className="fas fa-phone mr-2"></i>{phone}
                                                     </a>
                                                 ))}
+                                                {/* Fix: Added display of search grounding sources to comply with GenAI tools guidelines. */}
+                                                {lead.sources && lead.sources.length > 0 && (
+                                                    <div className="mt-2 pt-2 border-t border-border">
+                                                        <span className="text-[10px] uppercase font-bold text-muted-foreground block mb-1">Fonti Web:</span>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {lead.sources.map((source, idx) => (
+                                                                source.uri && (
+                                                                    <a 
+                                                                        key={idx} 
+                                                                        href={source.uri} 
+                                                                        target="_blank" 
+                                                                        rel="noopener noreferrer" 
+                                                                        className="text-[10px] bg-muted px-1.5 py-0.5 rounded hover:bg-accent transition-colors flex items-center gap-1"
+                                                                        title={source.title}
+                                                                    >
+                                                                        <i className="fas fa-link scale-75"></i>
+                                                                        Link {idx + 1}
+                                                                    </a>
+                                                                )
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="p-4">
@@ -110,7 +134,6 @@ const LeadList: React.FC<LeadListProps> = ({
                                             </select>
                                         </td>
                                         <td className="p-4 text-right text-muted-foreground">
-                                            {/* Fix: Corrected typo in method name to 'toLocaleDateString'. */}
                                             {new Date(lead.createdAt).toLocaleDateString('it-IT')}
                                         </td>
                                     </tr>

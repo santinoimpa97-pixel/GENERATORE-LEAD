@@ -6,11 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Generatore di Lead AI</title>
     <script>
-      // Polyfill ultra-sicuro: non sovrascrive se già esistente
-      window.process = window.process || {};
-      window.process.env = window.process.env || {};
+      // Polyfill ultra-sicuro per process.env
+      if (typeof window.process === 'undefined') {
+        window.process = { env: {} };
+      } else if (typeof window.process.env === 'undefined') {
+        window.process.env = {};
+      }
       
-      // Cattura errori globali per debugging immediato
       window.onerror = function(msg, url, line, col, error) {
         console.error("GLOBAL ERROR:", msg, "at", url, ":", line);
         return false;
