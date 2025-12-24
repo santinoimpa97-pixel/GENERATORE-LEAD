@@ -1,75 +1,56 @@
+
 import { createClient } from '@supabase/supabase-js';
 
-// Helper function to safely get environment variables
-const getEnvVar = (key: string): string | undefined => {
-    let val: string | undefined = undefined;
-
-    // 1. Try custom global object (Most reliable in this environment)
-    // @ts-ignore
-    if (typeof window !== 'undefined' && window.__APP_CONFIG__) {
-        // @ts-ignore
-        val = window.__APP_CONFIG__[key] || window.__APP_CONFIG__[`VITE_${key}`];
-    }
-
-    if (val && !val.includes('INSERISCI_QUI')) return val;
-
-    // 2. Try window.process
-    try {
-        // @ts-ignore
-        if (typeof window !== 'undefined' && window.process && window.process.env) {
-            // @ts-ignore
-            val = window.process.env[key] || window.process.env[`VITE_${key}`];
-        }
-    } catch (e) {}
-
-    if (val && !val.includes('INSERISCI_QUI')) return val;
-
-    // 3. Try import.meta.env
-    try {
-        // @ts-ignore
-        if (typeof import.meta !== 'undefined' && import.meta.env) {
-            // @ts-ignore
-            val = import.meta.env[key] || import.meta.env[`VITE_${key}`];
-        }
-    } catch (e) {}
-
-    if (val && val.includes('INSERISCI_QUI')) return undefined;
-    
-    return val;
+const getEnv = (name: string): string => {
+  const win = window as any;
+  const val = process.env[name] || 
+              process.env[`VITE_${name}`] || 
+              win.process?.env?.[name] || 
+              win.process?.env?.[`VITE_${name}`] || 
+              "";
+  
+  if (val) {
+      console.log(`[Env] Trovata chiave ${name}: ${val.substring(0, 5)}...`);
+  } else {
+      console.warn(`[Env] Chiave ${name} NON trovata.`);
+  }
+  return val;
 };
 
-const supabaseUrl = getEnvVar('SUPABASE_URL');
-const supabaseAnonKey = getEnvVar('SUPABASE_ANON_KEY');
+const url = getEnv('SUPABASE_URL');
+const key = getEnv('SUPABASE_ANON_KEY');
 
-const hasUrl = !!supabaseUrl && supabaseUrl.startsWith('http');
-const hasKey = !!supabaseAnonKey && supabaseAnonKey.length > 20;
+const isValid = !!url && url.startsWith('https://') && !!key;
 
-if (!hasUrl || !hasKey) {
-    // @ts-ignore
-    const configObj = typeof window !== 'undefined' ? window.__APP_CONFIG__ : {};
-    let configStr = "{}";
-    try {
-        configStr = JSON.stringify(configObj, null, 2);
-    } catch (e) {
-        configStr = "[Error serializing config]";
+export const supabaseConfigInfo = {
+  isValid,
+  missingUrl: !url,
+  missingKey: !key,
+  error: !isValid ? "Configurazione database mancante. Verifica le chiavi su Vercel." : null
+};
+
+export const supabaseConnectionError = supabaseConfigInfo.error;
+
+// Inizializzazione protetta: se i dati mancano, creiamo un client "dummy" per evitare crash di modulo
+let supabaseInstance: any;
+
+try {
+    if (isValid) {
+        supabaseInstance = createClient(url, key);
+    } else {
+        // Mock object per evitare errori "cannot read properties of undefined" durante il boot
+        supabaseInstance = {
+            auth: { 
+                onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+                getSession: async () => ({ data: { session: null }, error: null }),
+                signOut: async () => {}
+            },
+            from: () => ({ select: () => ({ order: () => ({ eq: () => ({ limit: () => ({}) }) }) }) })
+        };
     }
-    
-    // Concatenazione esplicita per evitare [object Object] su alcune console
-    console.error("[Supabase Init] ERRORE CRITICO: Credenziali mancanti.\n" +
-        "Has URL: " + hasUrl + "\n" +
-        "Has Key: " + hasKey + "\n" +
-        "Config Dump:\n" + configStr
-    );
-} else {
-    console.log(`[Supabase Init] OK. URL: ${supabaseUrl?.substring(0, 15)}...`);
+} catch (e) {
+    console.error("Eccezione durante createClient:", e);
+    supabaseInstance = {}; 
 }
 
-export const supabaseConnectionError = (!hasUrl || !hasKey) 
-    ? `Configurazione database incompleta. Controlla la console del browser per i dettagli.` 
-    : null;
-
-const validUrl = hasUrl ? supabaseUrl! : 'https://placeholder.supabase.co';
-const validKey = hasKey ? supabaseAnonKey! : 'placeholder';
-
-// @ts-ignore
-export const supabase = createClient(validUrl, validKey) as any;
+export const supabase = supabaseInstance;

@@ -1,7 +1,7 @@
+
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
 import { supabase, supabaseConnectionError } from '../services/supabaseClient';
 
-// Fallback types since @supabase/supabase-js types seem to be missing or incompatible
 type Session = any;
 type User = any;
 
@@ -21,69 +21,68 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // If Supabase isn't configured, don't try to set up auth listeners.
-        // This prevents the app from crashing and allows the error message to be shown.
-        if (supabaseConnectionError) {
+        // Se c'è un errore di connessione palese, non tentare l'auth
+        if (supabaseConnectionError || !supabase.auth) {
             setLoading(false);
             return;
         }
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-        });
+        const timeout = setTimeout(() => {
+            if (loading) {
+                console.warn("Auth timeout: sblocco manuale");
+                setLoading(false);
+            }
+        }, 5000);
 
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }: any) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-        });
+        try {
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+                setSession(session);
+                setUser(session?.user ?? null);
+                setLoading(false);
+                clearTimeout(timeout);
+            });
 
-        return () => {
-            subscription?.unsubscribe();
-        };
+            supabase.auth.getSession().then(({ data: { session } }: any) => {
+                setSession(session);
+                setUser(session?.user ?? null);
+                setLoading(false);
+                clearTimeout(timeout);
+            }).catch((err: any) => {
+                console.error("Auth Session Error:", err);
+                setLoading(false);
+            });
+
+            return () => {
+                subscription?.unsubscribe();
+                clearTimeout(timeout);
+            };
+        } catch (e) {
+            console.error("Eccezione in AuthProvider useEffect:", e);
+            setLoading(false);
+        }
     }, []);
 
     const logout = async () => {
-        if (supabaseConnectionError) return;
-        
-        // Pulisce la cache dei dati dell'utente prima del logout.
-        if (user) {
-            localStorage.removeItem(`crm_cache_${user.id}`);
-        }
-
+        if (supabaseConnectionError || !supabase.auth) return;
+        if (user) localStorage.removeItem(`crm_cache_${user.id}`);
         await supabase.auth.signOut();
     };
     
     const updateUserMetadata = async (metadata: { name?: string }) => {
-        if (supabaseConnectionError) throw new Error("Supabase client is not initialized.");
+        if (supabaseConnectionError || !supabase.auth) throw new Error("Supabase non configurato.");
         const { error } = await supabase.auth.updateUser({ data: metadata });
         if (error) throw error;
     };
 
-
-    const value = {
-        session,
-        user,
-        loading,
-        logout,
-        updateUserMetadata,
-    };
-
     return (
-        <AuthContext.Provider value={value}>
-            {/* The loading check here prevents children from rendering before the initial session is loaded (or error is handled) */}
-            {!loading && children}
+        <AuthContext.Provider value={{ session, user, loading, logout, updateUserMetadata }}>
+            {children}
         </AuthContext.Provider>
     );
 };
 
 export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext);
-    if (context === undefined) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
+    if (context === undefined) throw new Error('useAuth must be used within an AuthProvider');
     return context;
 };

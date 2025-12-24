@@ -1,38 +1,20 @@
+
 <!DOCTYPE html>
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Generatore di Lead AI</title>
-    <!-- Configurazione Globale per Ambiente Browser -->
     <script>
-      (function() {
-        // Chiave API fornita per il funzionamento dell'app
-        const API_KEY = "AIzaSyADL0PbzNrxyFNcupciKV6UXkP8FDctLhg";
-        
-        const config = {
-          API_KEY: API_KEY,
-          VITE_API_KEY: API_KEY,
-          VITE_SUPABASE_URL: "https://eggbhehdbehfngqzxyzl.supabase.co",
-          VITE_SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVnZ2JoZWhkYmVoZm5ncXp4eXpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3Nzk2NTYsImV4cCI6MjA3NTM1NTY1Nn0.IpDozjWedurgoBeMX5Bi0dX4KEqDyQlN1PsNjyNXuMQ"
-        };
-        
-        // Esposizione globale per accesso diretto
-        window.__APP_CONFIG__ = config;
-        
-        // Polyfill per librerie che si aspettano process.env (Gemini SDK)
-        window.process = window.process || {};
-        window.process.env = window.process.env || {};
-        
-        // Iniezione forzata delle chiavi
-        window.process.env.API_KEY = API_KEY;
-        window.process.env.VITE_API_KEY = API_KEY;
-        
-        // Copia di tutta la config
-        Object.assign(window.process.env, config);
-        
-        console.log("[Config] Ambiente inizializzato con successo.");
-      })();
+      // Polyfill ultra-sicuro: non sovrascrive se già esistente
+      window.process = window.process || {};
+      window.process.env = window.process.env || {};
+      
+      // Cattura errori globali per debugging immediato
+      window.onerror = function(msg, url, line, col, error) {
+        console.error("GLOBAL ERROR:", msg, "at", url, ":", line);
+        return false;
+      };
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -42,38 +24,12 @@
           extend: {
             colors: {
               border: "hsl(var(--border))",
-              input: "hsl(var(--input))",
-              ring: "hsl(var(--ring))",
               background: "hsl(var(--background))",
               foreground: "hsl(var(--foreground))",
-              primary: {
-                DEFAULT: "hsl(var(--primary))",
-                foreground: "hsl(var(--primary-foreground))",
-              },
-              secondary: {
-                DEFAULT: "hsl(var(--secondary))",
-                foreground: "hsl(var(--secondary-foreground))",
-              },
-              destructive: {
-                DEFAULT: "hsl(var(--destructive))",
-                foreground: "hsl(var(--destructive-foreground))",
-              },
-              muted: {
-                DEFAULT: "hsl(var(--muted))",
-                foreground: "hsl(var(--muted-foreground))",
-              },
-              accent: {
-                DEFAULT: "hsl(var(--accent))",
-                foreground: "hsl(var(--accent-foreground))",
-              },
-              popover: {
-                DEFAULT: "hsl(var(--popover))",
-                foreground: "hsl(var(--popover-foreground))",
-              },
-              card: {
-                DEFAULT: "hsl(var(--card))",
-                foreground: "hsl(var(--card-foreground))",
-              },
+              primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+              destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
+              muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
+              card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
             },
           }
         }
@@ -81,46 +37,20 @@
     </script>
      <style>
       :root {
-        --background: 0 0% 100%;
-        --foreground: 222.2 84% 4.9%;
-        --card: 0 0% 100%;
-        --card-foreground: 222.2 84% 4.9%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 222.2 84% 4.9%;
-        --primary: 221.2 83.2% 53.3%;
-        --primary-foreground: 210 40% 98%;
-        --secondary: 210 40% 96.1%;
-        --secondary-foreground: 222.2 47.4% 11.2%;
-        --muted: 210 40% 96.1%;
-        --muted-foreground: 215.4 16.3% 46.9%;
-        --accent: 210 40% 96.1%;
-        --accent-foreground: 222.2 47.4% 11.2%;
-        --destructive: 0 84.2% 60.2%;
-        --destructive-foreground: 210 40% 98%;
+        --background: 0 0% 100%; --foreground: 222.2 84% 4.9%;
+        --card: 0 0% 100%; --card-foreground: 222.2 84% 4.9%;
+        --primary: 221.2 83.2% 53.3%; --primary-foreground: 210 40% 98%;
+        --destructive: 0 84.2% 60.2%; --destructive-foreground: 210 40% 98%;
+        --muted: 210 40% 96.1%; --muted-foreground: 215.4 16.3% 46.9%;
         --border: 214.3 31.8% 91.4%;
-        --input: 214.3 31.8% 91.4%;
-        --ring: 222.2 84% 4.9%;
       }
       .dark {
-        --background: 222.2 84% 4.9%;
-        --foreground: 210 40% 98%;
-        --card: 222.2 84% 4.9%;
-        --card-foreground: 210 40% 98%;
-        --popover: 222.2 84% 4.9%;
-        --popover-foreground: 210 40% 98%;
-        --primary: 217.2 91.2% 59.8%;
-        --primary-foreground: 222.2 47.4% 11.2%;
-        --secondary: 217.2 32.6% 17.5%;
-        --secondary-foreground: 210 40% 98%;
-        --muted: 217.2 32.6% 17.5%;
-        --muted-foreground: 215 20.2% 65.1%;
-        --accent: 217.2 32.6% 17.5%;
-        --accent-foreground: 210 40% 98%;
-        --destructive: 0 62.8% 30.6%;
-        --destructive-foreground: 210 40% 98%;
+        --background: 222.2 84% 4.9%; --foreground: 210 40% 98%;
+        --card: 222.2 84% 4.9%; --card-foreground: 210 40% 98%;
+        --primary: 217.2 91.2% 59.8%; --primary-foreground: 222.2 47.4% 11.2%;
+        --destructive: 0 62.8% 30.6%; --destructive-foreground: 210 40% 98%;
+        --muted: 217.2 32.6% 17.5%; --muted-foreground: 215 20.2% 65.1%;
         --border: 217.2 32.6% 17.5%;
-        --input: 217.2 32.6% 17.5%;
-        --ring: 212.7 26.8% 83.9%;
       }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
@@ -138,7 +68,12 @@
     </script>
   </head>
   <body class="bg-background text-foreground">
-    <div id="root"></div>
+    <div id="root">
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; color:#666;">
+            <i class="fas fa-circle-notch fa-spin" style="font-size:2rem; color:#3b82f6; margin-bottom:1rem;"></i>
+            <p>Caricamento sistema...</p>
+        </div>
+    </div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
