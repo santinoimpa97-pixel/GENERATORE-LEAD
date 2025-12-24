@@ -25,15 +25,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     onImport,
     onImportError,
 }) => {
-    const handleReconfigureKey = async () => {
-        if (window.aistudio && window.aistudio.openSelectKey) {
-            await window.aistudio.openSelectKey();
-            window.location.reload();
-        } else {
-            alert("Usa le variabili d'ambiente di Vercel (VITE_API_KEY) per configurare la chiave.");
-        }
-    };
-
     return (
         <aside className="w-64 bg-card border-r border-border flex flex-col p-4 space-y-4 sticky top-0 h-screen">
             <div className="flex-grow">
@@ -68,13 +59,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                         isActive={false} 
                         onClick={onManageColumns} 
                     />
-                    <button 
-                        onClick={handleReconfigureKey}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors mt-1"
-                    >
-                        <i className="fas fa-key w-5 text-center"></i>
-                        <span>Configura API</span>
-                    </button>
                 </div>
             </div>
 

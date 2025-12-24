@@ -16,13 +16,6 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
     const [count, setCount] = useState(5);
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSelectNewKey = async () => {
-        if (window.aistudio && typeof window.aistudio.openSelectKey === 'function') {
-            await window.aistudio.openSelectKey();
-            window.location.reload(); // Ricarichiamo per pulire lo stato
-        }
-    };
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!query.trim()) return;
@@ -43,11 +36,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
             }
         } catch (err: any) {
             console.error(err);
-            if (err.message === "AUTH_REQUIRED") {
-                onGenerationEnd(false, "La chiave API è scaduta o non valida. Clicca 'Chiave API' per aggiornarla.");
-            } else {
-                onGenerationEnd(false, err.message || "Errore durante la generazione.");
-            }
+            onGenerationEnd(false, err.message || "Errore durante la generazione.");
         } finally {
             setIsLoading(false);
         }
@@ -55,21 +44,12 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
 
     return (
         <div className="bg-card border border-border p-6 rounded-2xl shadow-xl h-full relative overflow-hidden group">
-            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
-                    onClick={handleSelectNewKey}
-                    className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
-                >
-                    <i className="fas fa-cog"></i> Chiave API
-                </button>
-            </div>
-
             <div className="mb-6">
                 <h3 className="text-xl font-bold text-card-foreground flex items-center gap-2">
                     <i className="fas fa-magic text-primary"></i> 
                     Ricerca Lead Intelligente
                 </h3>
-                <p className="text-sm text-muted-foreground">L'AI cercherà aziende reali sul web per te.</p>
+                <p className="text-sm text-muted-foreground">L'AI cercherà aziende reali sul web per te via server sicuro.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
