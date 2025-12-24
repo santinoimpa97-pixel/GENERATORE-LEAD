@@ -2,21 +2,20 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Lead, Sector } from '../types';
 
-// Fix: Simplified API key retrieval to use process.env.API_KEY as the single source of truth.
 export const generateLeads = async (
     query: string, 
     count: number, 
     existingLeads: { name: string; location: string }[]
 ): Promise<Partial<Lead>[]> => {
     
-    // Fix: Obtained API key exclusively from environment variables as per hard requirement.
+    // Il punto unico di verità è process.env.API_KEY, popolato da index.html
     const apiKey = process.env.API_KEY;
     
     if (!apiKey || apiKey.length < 5) {
+        console.error("Gemini API Key missing in process.env.API_KEY");
         throw new Error("AUTH_REQUIRED");
     }
 
-    // Fix: Initialize GoogleGenAI with a named parameter object.
     const ai = new GoogleGenAI({ apiKey });
     const validSectors = Object.values(Sector).join(', ');
     const exclusionContext = existingLeads.length > 0 
@@ -50,13 +49,11 @@ export const generateLeads = async (
             },
         });
 
-        // Fix: Direct access to the .text property of GenerateContentResponse.
         const text = response.text;
         if (!text) return [];
         
         const parsed = JSON.parse(text);
         
-        // Fix: Extract website URLs from groundingChunks as per Google Search grounding requirements.
         const sources = response.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((chunk: any) => ({
             uri: chunk.web?.uri,
             title: chunk.web?.title
@@ -65,9 +62,8 @@ export const generateLeads = async (
         return parsed.map((lead: any) => ({ ...lead, sources }));
 
     } catch (error: any) {
-        console.error("Gemini Error:", error);
-        // Fix: Improved error handling for common API key issues.
-        if (error?.message?.includes("403") || error?.message?.includes("API_KEY") || error?.message?.includes("not found")) {
+        console.error("Gemini Error Detail:", error);
+        if (error?.message?.includes("403") || error?.message?.includes("API_KEY") || error?.message?.includes("not found") || error?.message?.includes("expired")) {
             throw new Error("AUTH_REQUIRED");
         }
         throw error;

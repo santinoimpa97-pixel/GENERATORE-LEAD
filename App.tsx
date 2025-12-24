@@ -3,17 +3,16 @@ import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import { useAuth } from './context/AuthContext';
 import AuthPage from './components/auth/AuthPage';
-import { supabaseConfigInfo } from './services/supabaseClient';
 
 const App: React.FC = () => {
     const { session, loading: authLoading } = useAuth();
     const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'found' | 'missing'>('checking');
 
-    // Fix: Completed API key check logic. Exclusive reliance on process.env.API_KEY is preferred.
     useEffect(() => {
         const checkKeys = async () => {
             try {
                 const win = window as any;
+                // Controlliamo process.env.API_KEY che ora è popolato dal ponte in index.html
                 const key = process.env.API_KEY;
                 
                 if (key && key.length > 5) {
@@ -22,8 +21,11 @@ const App: React.FC = () => {
                     const hasKey = await win.aistudio.hasSelectedApiKey();
                     setApiKeyStatus(hasKey ? 'found' : 'missing');
                 } else {
-                    // Ritardiamo leggermente la marcatura come "missing" per gestire eventuali caricamenti asincroni di script-injection
-                    setTimeout(() => setApiKeyStatus(prev => prev === 'checking' ? 'missing' : prev), 1000);
+                    // Se siamo su Vercel e ancora non c'è, diamo un secondo di tempo per eventuali caricamenti asincroni
+                    setTimeout(() => {
+                        const lateKey = process.env.API_KEY;
+                        setApiKeyStatus(lateKey && lateKey.length > 5 ? 'found' : 'missing');
+                    }, 500);
                 }
             } catch (e) {
                 setApiKeyStatus('missing');
@@ -46,23 +48,23 @@ const App: React.FC = () => {
         return <AuthPage />;
     }
 
-    // Fix: Added method to trigger API key selection dialog as per guidelines.
     const handleSelectKey = async () => {
         const win = window as any;
         if (win.aistudio && typeof win.aistudio.openSelectKey === 'function') {
             await win.aistudio.openSelectKey();
-            // Guidelines: assume the key selection was successful after triggering openSelectKey()
             setApiKeyStatus('found');
+        } else {
+            // Se non siamo in AI Studio, mostriamo un alert informativo
+            alert("Per configurare la chiave su Vercel, vai nelle impostazioni del progetto (Environment Variables) e aggiungi API_KEY.");
         }
     };
 
     return (
         <div className="bg-background text-foreground min-h-screen flex flex-col">
-            {/* Banner di avviso solo se effettivamente mancano le chiavi e non siamo in fase di check */}
             {apiKeyStatus === 'missing' && (
                 <div className="bg-yellow-500 text-white text-center p-2 text-xs font-bold z-50 flex items-center justify-center gap-2">
                     <i className="fas fa-exclamation-triangle"></i>
-                    <span>Attenzione: Chiave API Gemini non trovata. Le funzioni di generazione lead intelligente potrebbero non funzionare.</span>
+                    <span>Attenzione: Chiave API Gemini non trovata nelle variabili d'ambiente.</span>
                     <button onClick={handleSelectKey} className="underline font-black hover:opacity-80 transition-opacity">Configura Ora</button>
                 </div>
             )}
@@ -71,5 +73,4 @@ const App: React.FC = () => {
     );
 };
 
-// Fix: Added missing default export.
 export default App;

@@ -6,11 +6,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Generatore di Lead AI</title>
     <script>
-      // Polyfill ultra-sicuro per process.env
-      if (typeof window.process === 'undefined') {
-        window.process = { env: {} };
-      } else if (typeof window.process.env === 'undefined') {
-        window.process.env = {};
+      // Polyfill evoluto per gestire variabili d'ambiente su diversi hosting (Vercel, Netlify, AI Studio)
+      if (typeof window.process === 'undefined') { window.process = { env: {} }; }
+      if (typeof window.process.env === 'undefined') { window.process.env = {}; }
+      
+      // Funzione per cercare la chiave API in tutti i posti possibili (Vite, Globali, etc)
+      const findApiKey = () => {
+        try {
+          // 1. Prova variabili globali iniettate
+          if (window.VITE_API_KEY) return window.VITE_API_KEY;
+          if (window.API_KEY) return window.API_KEY;
+          
+          // 2. Prova a vedere se è già in process.env
+          if (window.process.env.API_KEY) return window.process.env.API_KEY;
+          if (window.process.env.VITE_API_KEY) return window.process.env.VITE_API_KEY;
+
+          // 3. Fallback per ambienti di sviluppo/build
+          // @ts-ignore
+          if (typeof import.meta !== 'undefined' && import.meta.env) {
+            return import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
+          }
+        } catch (e) {}
+        return "";
+      };
+
+      // Consolidiamo la chiave in process.env.API_KEY (punto unico di verità richiesto)
+      const foundKey = findApiKey();
+      if (foundKey) {
+        window.process.env.API_KEY = foundKey;
+        console.log("✅ Gemini API Key rilevata e configurata.");
       }
       
       window.onerror = function(msg, url, line, col, error) {
