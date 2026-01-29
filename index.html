@@ -6,41 +6,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Generatore di Lead AI</title>
     <script>
-      // Polyfill evoluto per gestire variabili d'ambiente su diversi hosting (Vercel, Netlify, AI Studio)
-      if (typeof window.process === 'undefined') { window.process = { env: {} }; }
-      if (typeof window.process.env === 'undefined') { window.process.env = {}; }
-      
-      // Funzione per cercare la chiave API in tutti i posti possibili (Vite, Globali, etc)
-      const findApiKey = () => {
-        try {
-          // 1. Prova variabili globali iniettate
-          if (window.VITE_API_KEY) return window.VITE_API_KEY;
-          if (window.API_KEY) return window.API_KEY;
-          
-          // 2. Prova a vedere se è già in process.env
-          if (window.process.env.API_KEY) return window.process.env.API_KEY;
-          if (window.process.env.VITE_API_KEY) return window.process.env.VITE_API_KEY;
-
-          // 3. Fallback per ambienti di sviluppo/build
-          // @ts-ignore
-          if (typeof import.meta !== 'undefined' && import.meta.env) {
-            return import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
-          }
-        } catch (e) {}
-        return "";
-      };
-
-      // Consolidiamo la chiave in process.env.API_KEY (punto unico di verità richiesto)
-      const foundKey = findApiKey();
-      if (foundKey) {
-        window.process.env.API_KEY = foundKey;
-        console.log("✅ Gemini API Key rilevata e configurata.");
+      // Polyfill per process.env per garantire compatibilità con l'SDK Gemini
+      if (typeof window.process === 'undefined') { 
+        window.process = { env: {} }; 
+      } else if (typeof window.process.env === 'undefined') {
+        window.process.env = {};
       }
       
-      window.onerror = function(msg, url, line, col, error) {
-        console.error("GLOBAL ERROR:", msg, "at", url, ":", line);
-        return false;
+      const findApiKey = () => {
+        // Cerca la chiave in ordine di priorità tra le possibili fonti globali
+        return window.API_KEY || 
+               window.VITE_API_KEY || 
+               (window.process && window.process.env && window.process.env.API_KEY) || 
+               (window.process && window.process.env && window.process.env.VITE_API_KEY) || 
+               "";
       };
+
+      // Iniezione forzata nel sistema process.env richiesto dalle linee guida
+      const key = findApiKey();
+      if (key) {
+        window.process.env.API_KEY = key;
+        console.log("✅ API Key rilevata e configurata.");
+      } else {
+        console.warn("⚠️ API Key non trovata nelle variabili d'ambiente.");
+      }
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -77,6 +66,13 @@
         --destructive: 0 62.8% 30.6%; --destructive-foreground: 210 40% 98%;
         --muted: 217.2 32.6% 17.5%; --muted-foreground: 215 20.2% 65.1%;
         --border: 217.2 32.6% 17.5%;
+      }
+      @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fade-in-up {
+        animation: fadeInUp 0.3s ease-out forwards;
       }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />

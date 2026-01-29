@@ -11,28 +11,36 @@ const App: React.FC = () => {
     useEffect(() => {
         const checkKeys = async () => {
             try {
-                const win = window as any;
-                // Controlliamo process.env.API_KEY che ora è popolato dal ponte in index.html
-                const key = process.env.API_KEY;
+                // Controllo esteso della chiave per bypassare eventuali shadowing dei bundler
+                const envKey = process.env.API_KEY || (window as any).process?.env?.API_KEY || "";
                 
-                if (key && key.length > 5) {
+                if (envKey && envKey.length > 5) {
                     setApiKeyStatus('found');
-                } else if (win.aistudio && typeof win.aistudio.hasSelectedApiKey === 'function') {
-                    const hasKey = await win.aistudio.hasSelectedApiKey();
-                    setApiKeyStatus(hasKey ? 'found' : 'missing');
-                } else {
-                    // Se siamo su Vercel e ancora non c'è, diamo un secondo di tempo per eventuali caricamenti asincroni
-                    setTimeout(() => {
-                        const lateKey = process.env.API_KEY;
-                        setApiKeyStatus(lateKey && lateKey.length > 5 ? 'found' : 'missing');
-                    }, 500);
+                    return;
                 }
+
+                // Controllo tramite l'estensione AI Studio se disponibile
+                const win = window as any;
+                if (win.aistudio && typeof win.aistudio.hasSelectedApiKey === 'function') {
+                    const hasKey = await win.aistudio.hasSelectedApiKey();
+                    if (hasKey) {
+                        setApiKeyStatus('found');
+                        return;
+                    }
+                }
+                
+                setApiKeyStatus('missing');
             } catch (e) {
+                console.error("Errore durante il controllo della chiave:", e);
                 setApiKeyStatus('missing');
             }
         };
 
         checkKeys();
+        
+        // Polling per rilevare cambiamenti dinamici (es. selezione chiave da dialogo)
+        const interval = setInterval(checkKeys, 2000);
+        return () => clearInterval(interval);
     }, [session]);
 
     if (authLoading) {
@@ -52,20 +60,25 @@ const App: React.FC = () => {
         const win = window as any;
         if (win.aistudio && typeof win.aistudio.openSelectKey === 'function') {
             await win.aistudio.openSelectKey();
+            // Come da linee guida: assumiamo successo dopo l'apertura del dialogo
             setApiKeyStatus('found');
         } else {
-            // Se non siamo in AI Studio, mostriamo un alert informativo
-            alert("Per configurare la chiave su Vercel, vai nelle impostazioni del progetto (Environment Variables) e aggiungi API_KEY.");
+            alert("⚠️ ISTRUZIONI VERCEL:\n\n1. Vai su Vercel Dashboard -> Settings -> Environment Variables.\n2. Aggiungi VITE_API_KEY (il prefisso VITE_ è obbligatorio).\n3. Salva e fai il REDEPLOY del progetto.");
         }
     };
 
     return (
         <div className="bg-background text-foreground min-h-screen flex flex-col">
             {apiKeyStatus === 'missing' && (
-                <div className="bg-yellow-500 text-white text-center p-2 text-xs font-bold z-50 flex items-center justify-center gap-2">
-                    <i className="fas fa-exclamation-triangle"></i>
-                    <span>Attenzione: Chiave API Gemini non trovata nelle variabili d'ambiente.</span>
-                    <button onClick={handleSelectKey} className="underline font-black hover:opacity-80 transition-opacity">Configura Ora</button>
+                <div className="bg-amber-600 text-white text-center p-3 text-xs font-bold z-[100] flex flex-col sm:flex-row items-center justify-center gap-2 shadow-lg animate-fade-in-up">
+                    <div className="flex items-center gap-2">
+                        <i className="fas fa-exclamation-triangle"></i>
+                        <span>Configurazione incompleta: chiave Gemini non rilevata.</span>
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={handleSelectKey} className="bg-white text-amber-700 px-3 py-1 rounded-full hover:bg-amber-50 transition-colors">Configura Ora</button>
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-80">Ottieni Chiave</a>
+                    </div>
                 </div>
             )}
             <Dashboard />

@@ -86,6 +86,23 @@ const LeadList: React.FC<LeadListProps> = ({
                                         <td className="p-4">
                                             <div className="font-bold text-card-foreground">{lead.name}</div>
                                             <div className="text-muted-foreground">{lead.sector} - {lead.location}</div>
+                                            {/* Extract and display URLs from groundingMetadata as required */}
+                                            {lead.sources && lead.sources.length > 0 && (
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    {lead.sources.map((source, sIdx) => (
+                                                        <a 
+                                                            key={sIdx} 
+                                                            href={source.uri} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer" 
+                                                            className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-primary/20"
+                                                            title={source.title}
+                                                        >
+                                                            <i className="fas fa-external-link-alt"></i> Fonte {sIdx + 1}
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="p-4">
                                             <div className="flex flex-col space-y-1">
