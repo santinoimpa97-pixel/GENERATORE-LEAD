@@ -96,29 +96,6 @@ const LeadList: React.FC<LeadListProps> = ({
                                                         <i className="fas fa-phone mr-2"></i>{phone}
                                                     </a>
                                                 ))}
-                                                {/* Fix: Added display of search grounding sources to comply with GenAI tools guidelines. */}
-                                                {lead.sources && lead.sources.length > 0 && (
-                                                    <div className="mt-2 pt-2 border-t border-border">
-                                                        <span className="text-[10px] uppercase font-bold text-muted-foreground block mb-1">Fonti Web:</span>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            {lead.sources.map((source, idx) => (
-                                                                source.uri && (
-                                                                    <a 
-                                                                        key={idx} 
-                                                                        href={source.uri} 
-                                                                        target="_blank" 
-                                                                        rel="noopener noreferrer" 
-                                                                        className="text-[10px] bg-muted px-1.5 py-0.5 rounded hover:bg-accent transition-colors flex items-center gap-1"
-                                                                        title={source.title}
-                                                                    >
-                                                                        <i className="fas fa-link scale-75"></i>
-                                                                        Link {idx + 1}
-                                                                    </a>
-                                                                )
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </div>
                                         </td>
                                         <td className="p-4">
@@ -126,7 +103,7 @@ const LeadList: React.FC<LeadListProps> = ({
                                                 value={lead.statusId} 
                                                 onChange={(e) => handleStatusChange(lead.id, e.target.value)}
                                                 className="p-1.5 bg-transparent border border-input rounded-md text-xs w-full"
-                                                onClick={(e) => e.stopPropagation()} // Prevents row selection when changing status
+                                                onClick={(e) => e.stopPropagation()}
                                             >
                                                 {columns.map(col => (
                                                     <option key={col.id} value={col.id}>{col.title}</option>
