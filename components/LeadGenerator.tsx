@@ -1,7 +1,6 @@
 
 import React, { useState } from 'react';
 import { generateLeads } from '../services/geminiService';
-import { Lead } from '../types';
 
 interface LeadGeneratorProps {
     existingLeads: { name: string; location: string }[];
@@ -22,43 +21,28 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
         if (!query.trim()) return;
 
         setIsLoading(true);
-        setStatusMessage('Avvio ricerca rapida...');
+        setStatusMessage('Inizializzazione...');
         onGenerationStart();
-
-        // Messaggi più veloci per riflettere il nuovo modello
-        const messages = [
-            'Accesso a Google Search...',
-            'Scansione mappe e siti web...',
-            'Estrazione contatti verificati...',
-            'Finalizzazione dati...'
-        ];
-        let msgIdx = 0;
-        const statusInterval = setInterval(() => {
-            setStatusMessage(messages[msgIdx]);
-            msgIdx = (msgIdx + 1) % messages.length;
-        }, 2000);
 
         try {
             const searchQuery = location ? `${query} a ${location}` : query;
             const newLeads = await generateLeads(searchQuery, count, existingLeads);
             
-            clearInterval(statusInterval);
             if (newLeads.length === 0) {
-                onGenerationEnd(false, "Nessun lead trovato. Prova a semplificare la ricerca.");
+                onGenerationEnd(false, "Nessun risultato trovato. Prova con termini più generici.");
             } else {
                 onLeadsGenerated(newLeads);
-                onGenerationEnd(true, `Generati ${newLeads.length} lead in tempo reale!`);
+                onGenerationEnd(true, `Trovati ${newLeads.length} nuovi lead.`);
                 setQuery('');
             }
         } catch (err: any) {
-            clearInterval(statusInterval);
             console.error(err);
-            if (err.message === "QUOTA_EXHAUSTED") {
-                onGenerationEnd(false, "Limite raggiunto. Attendi un momento.");
-            } else if (err.message === "AUTH_REQUIRED") {
-                onGenerationEnd(false, "Chiave API mancante. Configurala nelle impostazioni.");
+            if (err.message === "MISSING_SERVER_CONFIG") {
+                onGenerationEnd(false, "Errore: Variabile API_KEY non configurata nel server.");
+            } else if (err.status === 429) {
+                onGenerationEnd(false, "Limite di richieste raggiunto. Riprova tra un minuto.");
             } else {
-                onGenerationEnd(false, "Errore durante la ricerca. Riprova.");
+                onGenerationEnd(false, "Impossibile completare la ricerca. Verifica la connessione.");
             }
         } finally {
             setIsLoading(false);
@@ -71,26 +55,26 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
             <div className="mb-6">
                 <h3 className="text-xl font-bold text-card-foreground flex items-center gap-2">
                     <i className="fas fa-bolt text-yellow-500"></i> 
-                    Lead Generator Istantaneo
+                    Lead Generator AI
                 </h3>
-                <p className="text-sm text-muted-foreground">Ricerca rapida potenziata da Gemini 3 Flash.</p>
+                <p className="text-sm text-muted-foreground">Ricerca intelligente tramite Gemini 3 Flash.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="md:col-span-3">
-                        <label className="block text-xs font-bold uppercase text-muted-foreground mb-1">Settore o Azienda</label>
+                        <label className="block text-xs font-bold uppercase text-muted-foreground mb-1">Cosa cerchi?</label>
                         <input
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Es: Ristoranti, Carrozzieri..."
+                            placeholder="Es: Ristoranti, Studi Legali..."
                             className="w-full p-3 bg-muted/20 border border-input rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
                             required
                         />
                     </div>
                     <div className="md:col-span-1">
-                        <label className="block text-xs font-bold uppercase text-muted-foreground mb-1">Quantità</label>
+                        <label className="block text-xs font-bold uppercase text-muted-foreground mb-1">Q.tà</label>
                         <select
                             value={count}
                             onChange={(e) => setCount(parseInt(e.target.value))}
@@ -104,14 +88,14 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
                 </div>
 
                 <div>
-                    <label className="block text-xs font-bold uppercase text-muted-foreground mb-1">Città / Località</label>
+                    <label className="block text-xs font-bold uppercase text-muted-foreground mb-1">Dove?</label>
                     <div className="relative">
                         <i className="fas fa-map-marker-alt absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"></i>
                         <input
                             type="text"
                             value={location}
                             onChange={(e) => setLocation(e.target.value)}
-                            placeholder="Es: Milano, Roma..."
+                            placeholder="Città o Provincia"
                             className="w-full p-3 pl-10 bg-muted/20 border border-input rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
                         />
                     </div>
@@ -125,7 +109,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
                     {isLoading ? (
                         <>
                             <i className="fas fa-circle-notch fa-spin"></i>
-                            {statusMessage}
+                            Generazione in corso...
                         </>
                     ) : (
                         <>

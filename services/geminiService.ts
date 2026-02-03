@@ -8,27 +8,26 @@ export const generateLeads = async (
     existingLeads: { name: string; location: string }[]
 ): Promise<Partial<Lead>[]> => {
     
-    // Utilizzo ESCLUSIVO di process.env.API_KEY come da specifiche di sicurezza
+    // La chiave viene ottenuta ESCLUSIVAMENTE dalla variabile d'ambiente del sistema.
+    // Questo impedisce il blocco da parte di Google Security se il codice viene pushato su GitHub.
     const apiKey = process.env.API_KEY;
     
     if (!apiKey) {
-        console.error("Gemini API Key non configurata nell'ambiente.");
-        throw new Error("AUTH_REQUIRED");
+        throw new Error("MISSING_SERVER_CONFIG");
     }
 
     const ai = new GoogleGenAI({ apiKey });
     const exclusionContext = existingLeads.length > 0 
-        ? `Escludi: ${existingLeads.map(l => l.name).slice(0, 5).join(', ')}.`
+        ? `Escludi queste aziende: ${existingLeads.map(l => l.name).slice(0, 5).join(', ')}.`
         : '';
 
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
-            contents: `Trova ${count} aziende reali per la ricerca: "${query}". ${exclusionContext}`,
+            contents: `Trova ${count} aziende reali per: "${query}". ${exclusionContext}`,
             config: {
-                systemInstruction: `Sei un esperto Lead Generator. 
-                Trova dati REALI tramite ricerca Google.
-                Restituisci solo un array JSON di oggetti.
+                systemInstruction: `Sei un esperto Lead Generator. Trova dati REALI. 
+                Restituisci solo un array JSON.
                 FORMATO: [{"name": "...", "sector": "...", "location": "...", "email": "...", "phone": "...", "website": "...", "description": "..."}]`,
                 tools: [{ googleSearch: {} }],
                 responseMimeType: "application/json",
@@ -70,8 +69,7 @@ export const generateLeads = async (
         }));
 
     } catch (error: any) {
-        console.error("Gemini Error:", error);
-        if (error?.status === 429) throw new Error("QUOTA_EXHAUSTED");
+        console.error("Gemini API Error:", error);
         throw error;
     }
 };
