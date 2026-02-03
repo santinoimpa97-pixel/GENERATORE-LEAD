@@ -38,11 +38,11 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
             let errorMsg = "Errore durante la generazione.";
             
             if (err.message === "MISSING_API_KEY") {
-                errorMsg = "Configurazione mancante: imposta la variabile d'ambiente API_KEY nel tuo hosting (es. Vercel/Netlify).";
+                errorMsg = "CHIAVE NON RILEVATA: Se hai appena aggiunto la chiave su Vercel, devi andare nella tab 'Deployments' e cliccare su 'Redeploy' per rendere effettive le modifiche.";
             } else if (err.status === 403 || err.status === 401) {
-                errorMsg = "Chiave API non valida o disattivata da Google per motivi di sicurezza.";
+                errorMsg = "La chiave API fornita non è valida o è stata bloccata da Google.";
             } else if (err.status === 429) {
-                errorMsg = "Limite di richieste superato. Attendi un momento.";
+                errorMsg = "Troppe richieste. Attendi un minuto prima di riprovare.";
             }
 
             onGenerationEnd(false, errorMsg);
@@ -58,7 +58,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
                     <i className="fas fa-bolt text-yellow-500"></i> 
                     Lead Generator AI
                 </h3>
-                <p className="text-sm text-muted-foreground">Ricerca sicura tramite variabili d'ambiente.</p>
+                <p className="text-sm text-muted-foreground">Ricerca intelligente basata su dati Google Search.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -69,7 +69,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Es: Ristoranti, Agenzie..."
+                            placeholder="Es: Ristoranti, Agenzie Marketing..."
                             className="w-full p-3 bg-muted/20 border border-input rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
                             required
                         />
@@ -96,7 +96,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
                             type="text"
                             value={location}
                             onChange={(e) => setLocation(e.target.value)}
-                            placeholder="Città o Provincia"
+                            placeholder="Città o Regione"
                             className="w-full p-3 pl-10 bg-muted/20 border border-input rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
                         />
                     </div>
