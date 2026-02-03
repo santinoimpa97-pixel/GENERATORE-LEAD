@@ -14,14 +14,12 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
     const [location, setLocation] = useState('');
     const [count, setCount] = useState(5);
     const [isLoading, setIsLoading] = useState(false);
-    const [statusMessage, setStatusMessage] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!query.trim()) return;
 
         setIsLoading(true);
-        setStatusMessage('Inizializzazione...');
         onGenerationStart();
 
         try {
@@ -29,7 +27,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
             const newLeads = await generateLeads(searchQuery, count, existingLeads);
             
             if (newLeads.length === 0) {
-                onGenerationEnd(false, "Nessun risultato trovato. Prova con termini più generici.");
+                onGenerationEnd(false, "Nessun risultato trovato. Prova termini diversi.");
             } else {
                 onLeadsGenerated(newLeads);
                 onGenerationEnd(true, `Trovati ${newLeads.length} nuovi lead.`);
@@ -37,16 +35,19 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
             }
         } catch (err: any) {
             console.error(err);
-            if (err.message === "MISSING_SERVER_CONFIG") {
-                onGenerationEnd(false, "Errore: Variabile API_KEY non configurata nel server.");
+            let errorMsg = "Errore durante la generazione.";
+            
+            if (err.message === "MISSING_API_KEY") {
+                errorMsg = "Configurazione mancante: imposta la variabile d'ambiente API_KEY nel tuo hosting (es. Vercel/Netlify).";
+            } else if (err.status === 403 || err.status === 401) {
+                errorMsg = "Chiave API non valida o disattivata da Google per motivi di sicurezza.";
             } else if (err.status === 429) {
-                onGenerationEnd(false, "Limite di richieste raggiunto. Riprova tra un minuto.");
-            } else {
-                onGenerationEnd(false, "Impossibile completare la ricerca. Verifica la connessione.");
+                errorMsg = "Limite di richieste superato. Attendi un momento.";
             }
+
+            onGenerationEnd(false, errorMsg);
         } finally {
             setIsLoading(false);
-            setStatusMessage('');
         }
     };
 
@@ -57,18 +58,18 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
                     <i className="fas fa-bolt text-yellow-500"></i> 
                     Lead Generator AI
                 </h3>
-                <p className="text-sm text-muted-foreground">Ricerca intelligente tramite Gemini 3 Flash.</p>
+                <p className="text-sm text-muted-foreground">Ricerca sicura tramite variabili d'ambiente.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="md:col-span-3">
-                        <label className="block text-xs font-bold uppercase text-muted-foreground mb-1">Cosa cerchi?</label>
+                        <label className="block text-xs font-bold uppercase text-muted-foreground mb-1">Settore / Azienda</label>
                         <input
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Es: Ristoranti, Studi Legali..."
+                            placeholder="Es: Ristoranti, Agenzie..."
                             className="w-full p-3 bg-muted/20 border border-input rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
                             required
                         />
@@ -88,7 +89,7 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
                 </div>
 
                 <div>
-                    <label className="block text-xs font-bold uppercase text-muted-foreground mb-1">Dove?</label>
+                    <label className="block text-xs font-bold uppercase text-muted-foreground mb-1">Località</label>
                     <div className="relative">
                         <i className="fas fa-map-marker-alt absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"></i>
                         <input
@@ -109,12 +110,12 @@ const LeadGenerator: React.FC<LeadGeneratorProps> = ({ existingLeads, onLeadsGen
                     {isLoading ? (
                         <>
                             <i className="fas fa-circle-notch fa-spin"></i>
-                            Generazione in corso...
+                            Ricerca in corso...
                         </>
                     ) : (
                         <>
                             <i className="fas fa-magic"></i>
-                            Trova Lead Ora
+                            Genera Lead
                         </>
                     )}
                 </button>

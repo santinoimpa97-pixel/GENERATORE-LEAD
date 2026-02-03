@@ -8,17 +8,19 @@ export const generateLeads = async (
     existingLeads: { name: string; location: string }[]
 ): Promise<Partial<Lead>[]> => {
     
-    // La chiave viene ottenuta ESCLUSIVAMENTE dalla variabile d'ambiente del sistema.
-    // Questo impedisce il blocco da parte di Google Security se il codice viene pushato su GitHub.
-    const apiKey = process.env.API_KEY;
+    // Leggiamo la chiave ESCLUSIVAMENTE da process.env.API_KEY.
+    // Se stai usando Vite in locale, assicurati di avere 'process.env.API_KEY' definita o 
+    // di configurare il plugin 'vite-plugin-environment'.
+    const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : undefined;
     
     if (!apiKey) {
-        throw new Error("MISSING_SERVER_CONFIG");
+        console.error("ERRORE SICUREZZA: La variabile d'ambiente API_KEY non è stata trovata.");
+        throw new Error("MISSING_API_KEY");
     }
 
     const ai = new GoogleGenAI({ apiKey });
     const exclusionContext = existingLeads.length > 0 
-        ? `Escludi queste aziende: ${existingLeads.map(l => l.name).slice(0, 5).join(', ')}.`
+        ? `Escludi: ${existingLeads.map(l => l.name).slice(0, 5).join(', ')}.`
         : '';
 
     try {
@@ -26,8 +28,8 @@ export const generateLeads = async (
             model: 'gemini-3-flash-preview',
             contents: `Trova ${count} aziende reali per: "${query}". ${exclusionContext}`,
             config: {
-                systemInstruction: `Sei un esperto Lead Generator. Trova dati REALI. 
-                Restituisci solo un array JSON.
+                systemInstruction: `Sei un esperto Lead Generator. Trova dati REALI tramite ricerca Google.
+                Rispondi SOLO con un array JSON.
                 FORMATO: [{"name": "...", "sector": "...", "location": "...", "email": "...", "phone": "...", "website": "...", "description": "..."}]`,
                 tools: [{ googleSearch: {} }],
                 responseMimeType: "application/json",
